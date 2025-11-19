@@ -1,0 +1,17 @@
+name: pinact
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  ensure-pinned-actions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run pinact
+        run: npx --yes pinact --check
