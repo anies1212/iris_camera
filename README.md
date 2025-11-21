@@ -72,22 +72,23 @@ Nothing else is required; the plugin automatically requests permission the first
 
 ## Dart API Surface
 
-```dart
-final camera = IrisCamera();
-
-Future<List<CameraLensDescriptor>> listAvailableLenses();
-Future<CameraLensDescriptor> switchLens(CameraLensCategory category);
-Future<Uint8List> capturePhoto({PhotoCaptureOptions options});
-Future<void> setFocus({Offset? point, double? lensPosition});
-Future<void> setZoom(double zoomFactor);
-Future<void> setWhiteBalance({double? temperature, double? tint});
-```
+| API | Description | Key parameters |
+| --- | ----------- | -------------- |
+| `Future<List<CameraLensDescriptor>> listAvailableLenses()` | Enumerate available lenses (back-facing only for now). | – |
+| `Future<CameraLensDescriptor> switchLens(CameraLensCategory category)` | Reconfigure the session to the requested category (wide/ultraWide/telephoto/dual/triple/continuity/trueDepth). | `category` |
+| `Future<Uint8List> capturePhoto({PhotoCaptureOptions options})` | Capture a still JPEG from the active sensor. | `PhotoCaptureOptions` (see below) |
+| `Future<void> setFocus({Offset? point, double? lensPosition})` | Drive tap-to-focus or manual lens position. | `point` in 0–1 normalized preview coords, or `lensPosition` 0–1 |
+| `Future<void> setZoom(double zoomFactor)` | Apply digital zoom within the active format’s supported range. | `zoomFactor` |
+| `Future<void> setWhiteBalance({double? temperature, double? tint})` | Override white balance or revert to auto when omitted. | `temperature`, `tint` |
 
 - `CameraLensDescriptor` exposes `id`, `name`, `position`, `category`, optional `focalLength`, `fieldOfView`, and `supportsFocus` to indicate whether tap/manual focus is available for that lens.
-- `PhotoCaptureOptions` currently supports `flashMode` (`auto`, `on`, `off`), optional `exposureDuration`, and ISO overrides.
-- `setFocus` accepts either a normalized preview `point` (`Offset(dx, dy)` in [0–1]) or a `lensPosition` (0–1) to drive custom focus behaviour.
-- `setZoom` clamps values to the device’s supported zoom range, and `setWhiteBalance` accepts temperature/tint overrides (pass nulls to return to auto).
+- `PhotoCaptureOptions` supports:
+  - `flashMode` (`auto`, `on`, `off`)
+  - `exposureDuration` (`Duration` in microseconds; longer values enable long exposures, clamped to the device range)
+  - `iso` (double; clamped to the device range)
 - Errors throw `CameraLensSwitcherException` (`code`, `message`, `details`).
+
+> ⚠️ Platform support: only iOS is implemented right now; Android/Web will no-op until v2 adds those backends.
 
 ##
 
