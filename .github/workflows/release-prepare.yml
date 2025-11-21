@@ -14,7 +14,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # 5.0.1
         with:
@@ -77,11 +76,8 @@ jobs:
         uses: actions/ai-inference@a1c11829223a786afe3b5663db904a3aa1eac3a2 # v2.0.1
         with:
           model: gpt-4o-mini
-          messages: |
-            [
-              {"role":"system","content":"You write terse release notes."},
-              {"role":"user","content":${{ steps.prompt.outputs.prompt }}}
-            ]
+          system-prompt: You write terse release notes.
+          prompt: ${{ steps.prompt.outputs.prompt }}
 
       - name: Write changelog file
         id: notes
