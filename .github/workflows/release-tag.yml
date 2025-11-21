@@ -67,9 +67,9 @@ jobs:
           note_file="release_notes.md"
 
           if [[ -n "$OPENAI_API_KEY" ]]; then
-            cat > prompt.txt <<'EOF'
-You are a release note assistant. Summarize the changes into a concise changelog with bullet points and short section titles if relevant. Keep it brief and focused on user-visible changes. Use English.
-EOF
+          cat > prompt.txt <<'EOF'
+          You are a release note assistant. Summarize the changes into a concise changelog with bullet points and short section titles if relevant. Keep it brief and focused on user-visible changes. Use English.
+          EOF
             echo "" >> prompt.txt
             echo "Version: $version" >> prompt.txt
             if [[ -n "$previous_tag" ]]; then

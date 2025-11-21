@@ -37,7 +37,8 @@ jobs:
           set -euo pipefail
           version="${{ steps.version.outputs.value }}"
 
-          perl -0pi -e "s/^version:\\s*.*/version: $version/" pubspec.yaml
+          # Use multiline mode so the version line is replaced even when not on the first line.
+          perl -0pi -e "s/^version:\\s*.*/version: $version/m" pubspec.yaml
 
       - name: Create release branch pull request
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.1.0
