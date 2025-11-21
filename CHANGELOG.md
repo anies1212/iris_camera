@@ -1,4 +1,14 @@
-## 0.0.1
+### 1.0.1
+
+- fix: github workflow (a7e4eb6)
+- fix: ai prompt (9283a6b)
+- fix: impl ai model secrets (29071ea)
+- fix: workflow promt (ea61c35)
+- fix: collect conetext (69ede28)
+- fix: workflows (aec3b45)
+- fix: delete eunsure step (540b69f)
+- fix: secret usage (1ce03ca)
+- fix: workflows (c9f5415)## 0.0.1
 
 - Initial release of `iris_camera` (previously `ios_camera_lens_switcher`):
   - Shared `IrisCameraPreview` widget wired to the same `AVCaptureSession` used for still capture.
