@@ -45,9 +45,11 @@ jobs:
           commits=$(git log --no-merges --pretty='- %s (%h)' ${range:+$range})
 
           echo "prev-tag=$prev_tag" >> "$GITHUB_OUTPUT"
-          echo "commits<<'EOF'" >> "$GITHUB_OUTPUT"
-          printf '%s\n' "$commits" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "commits<<EOF"
+            printf '%s\n' "$commits"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build changelog prompt
         id: prompt
