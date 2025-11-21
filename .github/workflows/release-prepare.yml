@@ -40,14 +40,18 @@ jobs:
           # Use multiline mode so the version line is replaced even when not on the first line.
           perl -0pi -e "s/^version:\\s*.*/version: $version/m" pubspec.yaml
 
+      - name: Ensure PAT is configured
+        run: |
+          if [[ -z "${{ secrets.IRIS_APP_SECRETS }}" ]]; then
+            echo "IRIS_APP_SECRETS (PAT with repo scope) is required to open PRs." >&2
+            exit 1
+          fi
+
       - name: Create release branch pull request
         uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.1.0
         with:
-          # GitHub restricts GITHUB_TOKEN from opening PRs unless
-          # "Allow GitHub Actions to create and approve pull requests" is enabled.
-          # Provide a classic PAT with repo scope via RELEASE_PR_TOKEN or enable the setting.
-          # Prefer PAT with PR permissions (IRIS_APP_SECRETS), fallback to RELEASE_PR_TOKEN or GITHUB_TOKEN.
-          token: ${{ secrets.IRIS_APP_SECRETS != '' && secrets.IRIS_APP_SECRETS || secrets.RELEASE_PR_TOKEN != '' && secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          # Use PAT with repo scope; GitHub blocks GITHUB_TOKEN from creating PRs when the setting is disabled.
+          token: ${{ secrets.IRIS_APP_SECRETS }}
           branch: release/${{ steps.version.outputs.value }}
           delete-branch: false
           commit-message: "chore: prepare release ${{ steps.version.outputs.value }}"
