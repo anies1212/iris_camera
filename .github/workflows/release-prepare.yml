@@ -102,6 +102,7 @@ jobs:
             cp CHANGELOG.md CHANGELOG.prev
             {
               printf '%s\n' "$new_section"
+              echo ""
               cat CHANGELOG.prev
             } > CHANGELOG.md
             rm -f CHANGELOG.prev
@@ -115,7 +116,7 @@ jobs:
             echo ""
             echo "Changelog:"
             echo ""
-            cat CHANGELOG.md
+            printf '%s\n\n%s\n' "$new_section"
           } > release_pr_body.md
 
           echo "body-path=release_pr_body.md" >> "$GITHUB_OUTPUT"
