@@ -1,0 +1,54 @@
+name: release-prepare
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  open-release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # 5.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Validate version input
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "Version must follow semver (e.g. 1.2.3 or 1.2.3-rc.1)" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update pubspec version
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.value }}"
+
+          perl -0pi -e "s/^version:\\s*.*/version: $version/" pubspec.yaml
+
+      - name: Create release branch pull request
+        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release/${{ steps.version.outputs.value }}
+          delete-branch: false
+          commit-message: "chore: prepare release ${{ steps.version.outputs.value }}"
+          title: "Release ${{
+            steps.version.outputs.value }}"
+          body: |
+            Prepare release ${{ steps.version.outputs.value }}.
+
+            - Bump package version in pubspec.yaml.
