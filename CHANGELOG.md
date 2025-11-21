@@ -1,3 +1,12 @@
+## 1.0.2
+
+- Improved code formatting
+- Updated to meet pub.dev criteria
+- Added code comments for clarity
+- Resolved makefile issues
+- Fixed ignored files
+- Addressed pubspec dependency conflicts
+
 ## 1.0.1
 
 - Improved overall formatting and output
