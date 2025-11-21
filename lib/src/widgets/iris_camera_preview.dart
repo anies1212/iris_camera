@@ -9,8 +9,10 @@ import 'focus_indicator_controller.dart';
 
 const String _kPreviewViewType = 'iris_camera/preview';
 
+/// Callback invoked with a tap-to-focus point in normalized preview coords.
 typedef TapToFocusCallback = FutureOr<void> Function(Offset normalizedPoint);
 
+/// Embeds the native iOS camera preview layer and optional focus indicator.
 class IrisCameraPreview extends StatefulWidget {
   const IrisCameraPreview({
     super.key,
@@ -31,17 +33,26 @@ class IrisCameraPreview extends StatefulWidget {
           'onTapFocus must be provided when enableTapToFocus is true.',
         );
 
+  /// Optional aspect ratio for the preview container.
   final double? aspectRatio;
+  /// Optional border radius for clipping the preview.
   final BorderRadius? borderRadius;
+  /// Background shown behind the native view.
   final Color backgroundColor;
   final Clip clipBehavior;
   final PlatformViewHitTestBehavior hitTestBehavior;
+  /// Placeholder displayed on non-iOS platforms.
   final Widget? placeholder;
   final PlatformViewCreatedCallback? onViewCreated;
+  /// Whether to render the focus indicator overlay.
   final bool showFocusIndicator;
+  /// Style applied to the focus indicator overlay.
   final FocusIndicatorStyle focusIndicatorStyle;
+  /// Optional external controller for the indicator.
   final FocusIndicatorController? focusIndicatorController;
+  /// Enables tap-to-focus gesture detection.
   final bool enableTapToFocus;
+  /// Callback invoked when the preview is tapped (normalized coordinates).
   final TapToFocusCallback? onTapFocus;
 
   @override

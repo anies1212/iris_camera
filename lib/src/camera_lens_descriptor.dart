@@ -1,5 +1,7 @@
+/// Physical position of a camera lens.
 enum CameraLensPosition { front, back, unspecified, external }
 
+/// High-level category mapped from the native lens type.
 enum CameraLensCategory {
   wide,
   ultraWide,
@@ -12,6 +14,7 @@ enum CameraLensCategory {
   unknown,
 }
 
+/// Metadata describing a camera lens exposed by the plugin.
 class CameraLensDescriptor {
   CameraLensDescriptor({
     required this.id,
@@ -23,12 +26,25 @@ class CameraLensDescriptor {
     this.fieldOfView,
   });
 
+  /// Unique stable identifier from the native platform.
   final String id;
+
+  /// Human-readable lens name.
   final String name;
+
+  /// Physical mount position (front/back/external).
   final CameraLensPosition position;
+
+  /// Lens category (wide/ultraWide/telephoto/etc).
   final CameraLensCategory category;
+
+  /// Whether manual/tap focus is supported on this lens.
   final bool supportsFocus;
+
+  /// Optional focal length in millimetres.
   final double? focalLength;
+
+  /// Optional horizontal field of view in degrees.
   final double? fieldOfView;
 
   factory CameraLensDescriptor.fromMap(Map<String, Object?> map) {
