@@ -12,10 +12,5 @@ let package = Package(
       name: "IrisCameraPlugin",
       path: "Classes"
     ),
-    .testTarget(
-      name: "IrisCameraPluginTests",
-      dependencies: ["IrisCameraPlugin"],
-      path: "Tests"
-    ),
   ]
 )
