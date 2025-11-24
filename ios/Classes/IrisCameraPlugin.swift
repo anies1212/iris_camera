@@ -2,15 +2,29 @@ import AVFoundation
 import Flutter
 import UIKit
 
-public class IrisCameraPlugin: NSObject, FlutterPlugin {
+public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AVCaptureVideoDataOutputSampleBufferDelegate {
   private static let channelName = "iris_camera"
+  private static let imageStreamChannelName = "iris_camera/imageStream"
+  private static let orientationChannelName = "iris_camera/orientation"
+  private static let stateChannelName = "iris_camera/state"
+  private static let focusExposureChannelName = "iris_camera/focusExposureState"
 
   private let sessionQueue = DispatchQueue(label: "iris_camera.session")
   private let captureSession = AVCaptureSession()
   private let photoOutput = AVCapturePhotoOutput()
+  private let videoOutputQueue = DispatchQueue(label: "iris_camera.videoOutput")
+  private let videoDataOutput = AVCaptureVideoDataOutput()
   private var currentInput: AVCaptureDeviceInput?
   private var selectedLensID: String?
   private var pendingPhotoCapture: PhotoCaptureDelegate?
+  private var currentSessionPreset: AVCaptureSession.Preset = .high
+  private var imageStreamSink: FlutterEventSink?
+  private var isStreaming = false
+  private let orientationStreamHandler = OrientationStreamHandler()
+  private let stateStreamHandler = StateStreamHandler()
+  private let focusExposureStreamHandler = FocusExposureStreamHandler()
+  private var isInitialized = false
+  private var isPaused = false
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: registrar.messenger())
@@ -18,6 +32,30 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     registrar.addMethodCallDelegate(instance, channel: channel)
     let previewFactory = CameraPreviewFactory(sessionProvider: { instance.captureSession })
     registrar.register(previewFactory, withId: "\(channelName)/preview")
+
+    let streamChannel = FlutterEventChannel(
+      name: imageStreamChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    streamChannel.setStreamHandler(instance)
+
+    let orientationChannel = FlutterEventChannel(
+      name: orientationChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    orientationChannel.setStreamHandler(instance.orientationStreamHandler)
+
+    let stateChannel = FlutterEventChannel(
+      name: stateChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    stateChannel.setStreamHandler(instance.stateStreamHandler)
+
+    let focusExposureChannel = FlutterEventChannel(
+      name: focusExposureChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    focusExposureChannel.setStreamHandler(instance.focusExposureStreamHandler)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -25,7 +63,7 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     case "getPlatformVersion":
       result("iOS " + UIDevice.current.systemVersion)
     case "listAvailableLenses":
-      result(listAvailableLenses())
+      result(listAvailableLenses(arguments: call.arguments))
     case "switchLens":
       switchLens(arguments: call.arguments, result: result)
     case "takePhoto":
@@ -36,10 +74,50 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
       setZoom(arguments: call.arguments, result: result)
     case "setWhiteBalance":
       setWhiteBalance(arguments: call.arguments, result: result)
+    case "setExposureMode":
+      setExposureMode(arguments: call.arguments, result: result)
+    case "getExposureMode":
+      getExposureMode(result: result)
+    case "setExposurePoint":
+      setExposurePoint(arguments: call.arguments, result: result)
+    case "getMinExposureOffset":
+      getExposureOffset(isMin: true, result: result)
+    case "getMaxExposureOffset":
+      getExposureOffset(isMin: false, result: result)
+    case "setExposureOffset":
+      setExposureOffset(arguments: call.arguments, result: result)
+    case "getExposureOffset":
+      getCurrentExposureOffset(result: result)
+    case "getExposureOffsetStepSize":
+      getExposureOffsetStepSize(result: result)
+    case "startImageStream":
+      startImageStream(result: result)
+    case "stopImageStream":
+      stopImageStream(result: result)
+    case "setTorch":
+      setTorch(arguments: call.arguments, result: result)
+    case "setFocusMode":
+      setFocusMode(arguments: call.arguments, result: result)
+    case "getFocusMode":
+      getFocusMode(result: result)
+    case "setFrameRateRange":
+      setFrameRateRange(arguments: call.arguments, result: result)
+    case "setResolutionPreset":
+      setResolutionPreset(arguments: call.arguments, result: result)
+    case "initialize":
+      initializeSession(result: result)
+    case "pauseSession":
+      pauseSession(result: result)
+    case "resumeSession":
+      resumeSession(result: result)
+    case "disposeSession":
+      disposeSession(result: result)
     default:
       result(FlutterMethodNotImplemented)
     }
   }
+
+  // MARK: Lens management
 
   private func switchLens(arguments: Any?, result: @escaping FlutterResult) {
     guard let args = arguments as? [String: Any], let categoryName = args["category"] as? String else {
@@ -55,8 +133,10 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
       guard let self = self else { return }
       switch authorizationResult {
       case .failure(let error):
+        let flutterError = error.flutterError
         DispatchQueue.main.async {
-          result(error.flutterError)
+          self.emitState(.error, error: flutterError)
+          result(flutterError)
         }
       case .success:
         self.sessionQueue.async {
@@ -125,17 +205,16 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     currentInput = newInput
     selectedLensID = device.uniqueID
     ensurePhotoOutputAttached()
+    applySessionPresetIfNeeded()
 
     return descriptorDictionary(for: device)
   }
 
-  private func listAvailableLenses() -> [[String: Any]] {
+  private func listAvailableLenses(arguments: Any?) -> [[String: Any]] {
+    let payload = arguments as? [String: Any]
+    let includeFront = payload?["includeFront"] as? Bool ?? true
     return devices().compactMap { device in
-      if device.position == .front {
-        // The preview layer is backed by a single AVCaptureSession that is
-        // shared with still photo capture. Supporting the front camera would
-        // require a dedicated preview pipeline to handle mirrored output, so
-        // it is excluded for now to avoid exposing a lens that cannot render.
+      if device.position == .front && !includeFront {
         return nil
       }
       return descriptorDictionary(for: device)
@@ -242,6 +321,8 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     }
   }
 
+  // MARK: Permissions / session helpers
+
   private func ensureAuthorization(completion: @escaping (Result<Void, CameraSwitchError>) -> Void) {
     let status = AVCaptureDevice.authorizationStatus(for: .video)
     switch status {
@@ -259,6 +340,10 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
   private func startSessionIfNeeded() {
     guard !captureSession.isRunning else { return }
     captureSession.startRunning()
+    isPaused = false
+    if isInitialized {
+      emitState(.running)
+    }
   }
 
   private func ensurePhotoOutputAttached() {
@@ -271,6 +356,22 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     captureSession.addOutput(photoOutput)
     photoOutput.isHighResolutionCaptureEnabled = true
   }
+
+  private func ensureVideoDataOutputAttached() {
+    if captureSession.outputs.contains(where: { $0 === videoDataOutput }) {
+      return
+    }
+    videoDataOutput.videoSettings = [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+    ]
+    videoDataOutput.alwaysDiscardsLateVideoFrames = true
+    videoDataOutput.setSampleBufferDelegate(self, queue: videoOutputQueue)
+    if captureSession.canAddOutput(videoDataOutput) {
+      captureSession.addOutput(videoDataOutput)
+    }
+  }
+
+  // MARK: Capture
 
   private func takePhoto(arguments: Any?, result: @escaping FlutterResult) {
     ensureAuthorization { [weak self] authResult in
@@ -319,9 +420,9 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     }
 
     let exposureMicros = payload?["exposureDurationMicros"] as? Double ??
-      (payload?["exposureDurationMicros"] as? NSNumber)?.doubleValue
+    (payload?["exposureDurationMicros"] as? NSNumber)?.doubleValue
     let isoOverride = payload?["iso"] as? Double ??
-      (payload?["iso"] as? NSNumber)?.doubleValue
+    (payload?["iso"] as? NSNumber)?.doubleValue
     let appliedManualExposure = applyManualExposure(
       exposureMicros: exposureMicros,
       iso: isoOverride
@@ -415,6 +516,8 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     } catch { }
   }
 
+  // MARK: Focus / zoom / white balance / exposure controls
+
   private func setFocus(arguments: Any?, result: @escaping FlutterResult) {
     guard let device = currentInput?.device else {
       result(FlutterError(
@@ -428,7 +531,7 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     let x = payload?["x"] as? Double
     let y = payload?["y"] as? Double
     let lensPosition = payload?["lensPosition"] as? Double ??
-      (payload?["lensPosition"] as? NSNumber)?.doubleValue
+    (payload?["lensPosition"] as? NSNumber)?.doubleValue
 
     sessionQueue.async {
       do {
@@ -454,10 +557,12 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
             device.focusMode = .continuousAutoFocus
           }
           applied = true
+          self.focusExposureStreamHandler.emit(state: .focusing)
         }
         device.unlockForConfiguration()
         DispatchQueue.main.async {
           if applied {
+            self.focusExposureStreamHandler.emit(state: .focusLocked)
             result(nil)
           } else {
             result(FlutterError(
@@ -490,7 +595,7 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     }
     let payload = arguments as? [String: Any]
     let zoom = payload?["zoomFactor"] as? Double ??
-      (payload?["zoomFactor"] as? NSNumber)?.doubleValue ?? 1.0
+    (payload?["zoomFactor"] as? NSNumber)?.doubleValue ?? 1.0
     let clamped = max(1.0, min(zoom, Double(device.activeFormat.videoMaxZoomFactor)))
     sessionQueue.async {
       do {
@@ -521,9 +626,9 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     }
     let payload = arguments as? [String: Any]
     let temperature = payload?["temperature"] as? Double ??
-      (payload?["temperature"] as? NSNumber)?.doubleValue
+    (payload?["temperature"] as? NSNumber)?.doubleValue
     let tint = payload?["tint"] as? Double ??
-      (payload?["tint"] as? NSNumber)?.doubleValue
+    (payload?["tint"] as? NSNumber)?.doubleValue
 
     sessionQueue.async {
       do {
@@ -566,6 +671,512 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin {
     clamped.greenGain = max(minGain, min(gains.greenGain, maxGain))
     clamped.blueGain = max(minGain, min(gains.blueGain, maxGain))
     return clamped
+  }
+
+  private func setExposureMode(arguments: Any?, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(FlutterError(
+        code: "exposure_mode_failed",
+        message: "No active camera session is available for exposure updates.",
+        details: nil
+      ))
+      return
+    }
+    let payload = arguments as? [String: Any]
+    let mode = (payload?["mode"] as? String) ?? "auto"
+
+    sessionQueue.async {
+      do {
+        try device.lockForConfiguration()
+        switch mode {
+        case "locked":
+          if device.isExposureModeSupported(.locked) {
+            device.exposureMode = .locked
+          } else if device.isExposureModeSupported(.autoExpose) {
+            device.exposureMode = .autoExpose
+          }
+        default:
+          if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+          } else if device.isExposureModeSupported(.autoExpose) {
+            device.exposureMode = .autoExpose
+          }
+        }
+        device.unlockForConfiguration()
+        DispatchQueue.main.async { result(nil) }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(
+            code: "exposure_mode_failed",
+            message: error.localizedDescription,
+            details: nil
+          ))
+        }
+      }
+    }
+  }
+
+  private func getExposureMode(result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result("auto")
+      return
+    }
+    let mode: String
+    switch device.exposureMode {
+    case .locked:
+      mode = "locked"
+    default:
+      mode = "auto"
+    }
+    result(mode)
+  }
+
+  private func setExposurePoint(arguments: Any?, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(FlutterError(
+        code: "set_exposure_point_failed",
+        message: "No active camera session is available for exposure updates.",
+        details: nil
+      ))
+      return
+    }
+    let payload = arguments as? [String: Any]
+    let x = payload?["x"] as? Double
+    let y = payload?["y"] as? Double
+    guard let x, let y else {
+      result(FlutterError(
+        code: "invalid_arguments",
+        message: "Expected { x: <Double>, y: <Double> } for setExposurePoint.",
+        details: nil
+      ))
+      return
+    }
+
+    sessionQueue.async {
+      do {
+        try device.lockForConfiguration()
+        if device.isExposurePointOfInterestSupported {
+          let point = CGPoint(
+            x: max(0.0, min(x, 1.0)),
+            y: max(0.0, min(y, 1.0))
+          )
+          device.exposurePointOfInterest = point
+          if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+          } else if device.isExposureModeSupported(.autoExpose) {
+            device.exposureMode = .autoExpose
+          }
+          device.unlockForConfiguration()
+          DispatchQueue.main.async { result(nil) }
+        } else {
+          device.unlockForConfiguration()
+          DispatchQueue.main.async {
+            result(FlutterError(
+              code: "set_exposure_point_failed",
+              message: "Exposure point is not supported on this device.",
+              details: nil
+            ))
+          }
+        }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(
+            code: "set_exposure_point_failed",
+            message: error.localizedDescription,
+            details: nil
+          ))
+        }
+      }
+    }
+  }
+
+  private func getExposureOffset(isMin: Bool, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(0.0)
+      return
+    }
+    let value = isMin ? device.minExposureTargetBias : device.maxExposureTargetBias
+    result(Double(value))
+  }
+
+  private func setExposureOffset(arguments: Any?, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(FlutterError(
+        code: "set_exposure_offset_failed",
+        message: "No active camera session is available for exposure updates.",
+        details: nil
+      ))
+      return
+    }
+    let payload = arguments as? [String: Any]
+    let rawOffset = payload?["offset"] as? Double ?? (payload?["offset"] as? NSNumber)?.doubleValue ?? 0.0
+    sessionQueue.async {
+      let minOffset = Double(device.minExposureTargetBias)
+      let maxOffset = Double(device.maxExposureTargetBias)
+      let clamped = max(minOffset, min(rawOffset, maxOffset))
+      device.setExposureTargetBias(Float(clamped)) { _ in
+        DispatchQueue.main.async { result(clamped) }
+      }
+    }
+  }
+
+  private func getCurrentExposureOffset(result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(0.0)
+      return
+    }
+    result(Double(device.exposureTargetBias))
+  }
+
+  private func getExposureOffsetStepSize(result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(0.1)
+      return
+    }
+    let step = 0.1
+    let range = Double(device.maxExposureTargetBias - device.minExposureTargetBias)
+    result(min(step, max(0.01, range)))
+  }
+
+  private func setFocusMode(arguments: Any?, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(FlutterError(
+        code: "focus_mode_failed",
+        message: "No active camera session is available for focus updates.",
+        details: nil
+      ))
+      return
+    }
+    let payload = arguments as? [String: Any]
+    let mode = (payload?["mode"] as? String) ?? "auto"
+    sessionQueue.async {
+      do {
+        try device.lockForConfiguration()
+        switch mode {
+        case "locked":
+          if device.isFocusModeSupported(.locked) {
+            device.focusMode = .locked
+          } else if device.isLockingFocusWithCustomLensPositionSupported {
+            device.setFocusModeLocked(lensPosition: device.lensPosition, completionHandler: nil)
+          }
+        default:
+          if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+          } else if device.isFocusModeSupported(.autoFocus) {
+            device.focusMode = .autoFocus
+          }
+        }
+        device.unlockForConfiguration()
+        self.focusExposureStreamHandler.emit(state: .focusLocked)
+        DispatchQueue.main.async { result(nil) }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(
+            code: "focus_mode_failed",
+            message: error.localizedDescription,
+            details: nil
+          ))
+        }
+      }
+    }
+  }
+
+  private func getFocusMode(result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result("auto")
+      return
+    }
+    let mode: String
+    switch device.focusMode {
+    case .locked:
+      mode = "locked"
+    default:
+      mode = "auto"
+    }
+    result(mode)
+  }
+
+  private func setTorch(arguments: Any?, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(FlutterError(
+        code: "torch_failed",
+        message: "No active camera session is available for torch updates.",
+        details: nil
+      ))
+      return
+    }
+    guard device.hasTorch else {
+      result(FlutterError(
+        code: "torch_not_supported",
+        message: "Torch is not available on this device.",
+        details: nil
+      ))
+      return
+    }
+
+    let payload = arguments as? [String: Any]
+    let enabled = payload?["enabled"] as? Bool ?? false
+
+    sessionQueue.async {
+      do {
+        try device.lockForConfiguration()
+        device.torchMode = enabled ? .on : .off
+        device.unlockForConfiguration()
+        DispatchQueue.main.async { result(nil) }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(
+            code: "torch_failed",
+            message: error.localizedDescription,
+            details: nil
+          ))
+        }
+      }
+    }
+  }
+
+  // MARK: Streaming / frame rate / presets
+
+  private func ensureVideoOutputForStreaming() {
+    ensureVideoDataOutputAttached()
+    startSessionIfNeeded()
+  }
+
+  private func startImageStream(result: @escaping FlutterResult) {
+    guard currentInput != nil else {
+      result(FlutterError(
+        code: "stream_not_configured",
+        message: "Start a lens before starting image stream.",
+        details: nil
+      ))
+      return
+    }
+    sessionQueue.async {
+      self.ensureVideoOutputForStreaming()
+      self.isStreaming = true
+      DispatchQueue.main.async { result(nil) }
+    }
+  }
+
+  private func stopImageStream(result: @escaping FlutterResult) {
+    sessionQueue.async {
+      self.isStreaming = false
+      if self.captureSession.outputs.contains(where: { $0 === self.videoDataOutput }) {
+        self.captureSession.removeOutput(self.videoDataOutput)
+      }
+      self.videoDataOutput.setSampleBufferDelegate(nil, queue: nil)
+      DispatchQueue.main.async { result(nil) }
+    }
+  }
+
+  private func setFrameRateRange(arguments: Any?, result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(FlutterError(
+        code: "fps_failed",
+        message: "No active camera session is available for frame rate updates.",
+        details: nil
+      ))
+      return
+    }
+    let payload = arguments as? [String: Any]
+    let minFps = payload?["minFps"] as? Double ?? (payload?["minFps"] as? NSNumber)?.doubleValue
+    let maxFps = payload?["maxFps"] as? Double ?? (payload?["maxFps"] as? NSNumber)?.doubleValue
+    sessionQueue.async {
+      do {
+        try device.lockForConfiguration()
+        defer { device.unlockForConfiguration() }
+        if let minFps, minFps > 0 {
+          device.activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: Int32(minFps.rounded()))
+        }
+        if let maxFps, maxFps > 0 {
+          device.activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: Int32(maxFps.rounded()))
+        }
+        DispatchQueue.main.async { result(nil) }
+      } catch {
+        DispatchQueue.main.async {
+          let flutterError = FlutterError(
+            code: "fps_failed",
+            message: error.localizedDescription,
+            details: nil
+          )
+          self.emitState(.error, error: flutterError)
+          result(flutterError)
+        }
+      }
+    }
+  }
+
+  private func setResolutionPreset(arguments: Any?, result: @escaping FlutterResult) {
+    let payload = arguments as? [String: Any]
+    guard let presetName = payload?["preset"] as? String else {
+      result(FlutterError(
+        code: "invalid_arguments",
+        message: "Expected { preset: <String> } for setResolutionPreset.",
+        details: nil
+      ))
+      return
+    }
+    guard let preset = preset(from: presetName) else {
+      result(FlutterError(
+        code: "preset_not_supported",
+        message: "Unknown preset \(presetName).",
+        details: nil
+      ))
+      return
+    }
+
+    sessionQueue.async {
+      self.captureSession.beginConfiguration()
+      defer { self.captureSession.commitConfiguration() }
+      self.currentSessionPreset = preset
+      let canApplyNow = self.captureSession.inputs.isEmpty ? true : self.captureSession.canSetSessionPreset(preset)
+      if canApplyNow {
+        if self.captureSession.canSetSessionPreset(preset) {
+          self.captureSession.sessionPreset = preset
+        }
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
+      DispatchQueue.main.async {
+        result(FlutterError(
+          code: "preset_not_supported",
+          message: "Preset \(presetName) is not supported for the current session.",
+          details: nil
+        ))
+      }
+    }
+  }
+
+  private func preset(from name: String) -> AVCaptureSession.Preset? {
+    switch name {
+    case "low":
+      return .low
+    case "medium":
+      return .medium
+    case "high":
+      return .high
+    case "veryHigh":
+      return .hd1920x1080
+    case "ultraHigh":
+      return .hd4K3840x2160
+    case "max":
+      return .photo
+    default:
+      return nil
+    }
+  }
+
+  private func applySessionPresetIfNeeded() {
+    if captureSession.sessionPreset == currentSessionPreset {
+      return
+    }
+    if captureSession.canSetSessionPreset(currentSessionPreset) {
+      captureSession.sessionPreset = currentSessionPreset
+    }
+  }
+
+  // MARK: Lifecycle controls
+
+  private func initializeSession(result: @escaping FlutterResult) {
+    ensureAuthorization { [weak self] authResult in
+      guard let self else { return }
+      switch authResult {
+      case .failure(let error):
+        DispatchQueue.main.async { result(error.flutterError) }
+      case .success:
+        sessionQueue.async {
+          self.ensurePhotoOutputAttached()
+          self.applySessionPresetIfNeeded()
+          self.isInitialized = true
+          self.emitState(.initialized)
+          self.startSessionIfNeeded()
+          DispatchQueue.main.async { result(nil) }
+        }
+      }
+    }
+  }
+
+  private func pauseSession(result: @escaping FlutterResult) {
+    sessionQueue.async {
+      if self.captureSession.isRunning {
+        self.captureSession.stopRunning()
+        self.isPaused = true
+        self.emitState(.paused)
+      }
+      DispatchQueue.main.async { result(nil) }
+    }
+  }
+
+  private func resumeSession(result: @escaping FlutterResult) {
+    sessionQueue.async {
+      self.startSessionIfNeeded()
+      if self.isInitialized {
+        self.emitState(.running)
+      }
+      DispatchQueue.main.async { result(nil) }
+    }
+  }
+
+  private func disposeSession(result: @escaping FlutterResult) {
+    sessionQueue.async {
+      self.captureSession.stopRunning()
+      if let input = self.currentInput {
+        self.captureSession.removeInput(input)
+      }
+      if self.captureSession.outputs.contains(where: { $0 === self.photoOutput }) {
+        self.captureSession.removeOutput(self.photoOutput)
+      }
+      if self.captureSession.outputs.contains(where: { $0 === self.videoDataOutput }) {
+        self.captureSession.removeOutput(self.videoDataOutput)
+      }
+      self.currentInput = nil
+      self.selectedLensID = nil
+      self.isInitialized = false
+      self.isPaused = false
+      self.emitState(.disposed)
+      DispatchQueue.main.async { result(nil) }
+    }
+  }
+
+  private func emitState(_ state: CameraLifecycleStateNative, error: FlutterError? = nil) {
+    stateStreamHandler.emit(state: state, error: error)
+  }
+
+  // MARK: Event channel (image stream)
+
+  public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    imageStreamSink = events
+    return nil
+  }
+
+  public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    imageStreamSink = nil
+    return nil
+  }
+
+  public func captureOutput(
+    _ output: AVCaptureOutput,
+    didOutput sampleBuffer: CMSampleBuffer,
+    from connection: AVCaptureConnection
+  ) {
+    guard isStreaming, let sink = imageStreamSink else { return }
+    guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+    CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+    let width = CVPixelBufferGetWidth(pixelBuffer)
+    let height = CVPixelBufferGetHeight(pixelBuffer)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+    guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
+    let data = Data(bytes: baseAddress, count: bytesPerRow * height)
+    sink([
+      "bytes": FlutterStandardTypedData(bytes: data),
+      "width": width,
+      "height": height,
+      "bytesPerRow": bytesPerRow,
+      "format": "bgra8888",
+    ])
   }
 }
 
