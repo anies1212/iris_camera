@@ -84,7 +84,7 @@ Widget:
 
 ## iris_camera vs camera (iOS)
 
-| Capability | iris_camera | camera |
+| Capability | [iris_camera](https://pub.dev/packages/iris_camera) | [camera](https://pub.dev/packages/camera) |
 | --- | --- | --- |
 | Still photos | ✅ Shared session JPEG capture | ✅ |
 | Live preview widget | ✅ `IrisCameraPreview` (iOS) | ✅ |
