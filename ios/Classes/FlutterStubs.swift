@@ -1,7 +1,7 @@
 // Stubs to allow SwiftPM tests to compile when Flutter.framework is unavailable.
 #if !canImport(Flutter)
 import Foundation
-import UIKit
+import CoreGraphics
 
 public class FlutterError: NSError {
   public let code: String
@@ -60,5 +60,33 @@ public protocol FlutterPlatformView {
 public struct FlutterMethodCall {
   public let method: String
   public let arguments: Any?
+}
+
+// Minimal UIKit stubs
+public class UIView: NSObject {}
+
+public enum UIDeviceOrientation {
+  case portrait
+  case portraitUpsideDown
+  case landscapeLeft
+  case landscapeRight
+  case unknown
+}
+
+public class UIDevice {
+  public static let current = UIDevice()
+  public private(set) var orientation: UIDeviceOrientation = .portrait
+
+  public func beginGeneratingDeviceOrientationNotifications() {
+    // No-op in stub
+  }
+}
+
+public extension Notification.Name {
+  static let UIDeviceOrientationDidChange = Notification.Name("UIDeviceOrientationDidChange")
+}
+
+public extension UIDevice {
+  static let orientationDidChangeNotification = Notification.Name.UIDeviceOrientationDidChange
 }
 #endif

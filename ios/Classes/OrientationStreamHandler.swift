@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import Flutter
 import UIKit
 import AVFoundation
@@ -89,3 +90,12 @@ final class OrientationStreamHandler: NSObject, FlutterStreamHandler {
     }
   }
 }
+#else
+import Flutter
+import Foundation
+
+final class OrientationStreamHandler: NSObject, FlutterStreamHandler {
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? { nil }
+  func onCancel(withArguments arguments: Any?) -> FlutterError? { nil }
+}
+#endif

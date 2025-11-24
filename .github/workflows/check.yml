@@ -53,4 +53,6 @@ jobs:
 
       - name: Run Swift package tests
         working-directory: ios
-        run: swift test --enable-test-discovery
+        env:
+          SWIFTPM_MODULECACHE_OVERRIDE: /tmp/ModuleCache
+        run: swift test --disable-sandbox
