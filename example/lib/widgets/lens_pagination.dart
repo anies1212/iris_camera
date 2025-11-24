@@ -20,29 +20,39 @@ class LensPagination extends StatelessWidget {
     if (lenses.isEmpty) {
       return const SizedBox.shrink();
     }
-    return SizedBox(
-      height: 92,
-      child: PageView.builder(
-        controller: controller,
-        itemCount: lenses.length,
-        onPageChanged: onPageChanged,
-        physics: const BouncingScrollPhysics(),
-        itemBuilder: (context, index) {
-          final lens = lenses[index];
-          final isActive = lens.id == selectedLensId;
-          return AnimatedScale(
-            duration: const Duration(milliseconds: 200),
-            scale: isActive ? 1.0 : 0.9,
-            child: Center(
-              child: LensCard(
-                label: _lensLabel(lens),
-                subtitle: lens.category.name,
-                isActive: isActive,
-              ),
-            ),
-          );
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height =
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 92.0;
+        final clampedHeight = height.clamp(0.0, 120.0);
+        return SizedBox(
+          height: clampedHeight.toDouble(),
+          child: PageView.builder(
+            controller: controller,
+            itemCount: lenses.length,
+            onPageChanged: onPageChanged,
+            physics: const BouncingScrollPhysics(),
+            itemBuilder: (context, index) {
+              final lens = lenses[index];
+              final isActive = lens.id == selectedLensId;
+              return AnimatedScale(
+                duration: const Duration(milliseconds: 200),
+                scale: isActive ? 1.0 : 0.9,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Center(
+                    child: LensCard(
+                      label: _lensLabel(lens),
+                      subtitle: lens.category.name,
+                      isActive: isActive,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

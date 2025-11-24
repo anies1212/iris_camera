@@ -75,12 +75,24 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
 
     if (firstLens != null) {
       await _camera.switchLens(firstLens.category);
-      _lensPageController.jumpToPage(0);
+      _jumpToLensPage(0);
     }
 
     if (mounted) {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _jumpToLensPage(int index) {
+    if (_lensPageController.hasClients) {
+      _lensPageController.jumpToPage(index);
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_lensPageController.hasClients) {
+        _lensPageController.jumpToPage(index);
+      }
+    });
   }
 
   Future<void> _loadPlatformVersion() async {
@@ -239,153 +251,161 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                          child: Column(
-                            children: [
-                              ControlCard(
-                                title: 'White balance',
-                                trailing: TextButton(
-                                  onPressed: (_whiteBalanceTemperature !=
-                                              null ||
-                                          _whiteBalanceTint != null)
-                                      ? () => _applyWhiteBalance(reset: true)
-                                      : null,
-                                  child: const Text('Auto'),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    LabeledSlider(
-                                      label:
-                                          'Temperature ${(_whiteBalanceTemperature ?? 5000).round()}K',
-                                      value: (_whiteBalanceTemperature ?? 5000)
-                                          .clamp(2500, 7500),
-                                      min: 2500,
-                                      max: 7500,
-                                      divisions: 25,
-                                      onChanged: (value) {
-                                        _previewWhiteBalanceTemperature(value);
-                                      },
-                                      onChangeEnd: (value) =>
-                                          _applyWhiteBalance(
-                                              temperature: value),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    LabeledSlider(
-                                      label:
-                                          'Tint ${(_whiteBalanceTint ?? 0).toStringAsFixed(0)}',
-                                      value: (_whiteBalanceTint ?? 0)
-                                          .clamp(-150, 150),
-                                      min: -150,
-                                      max: 150,
-                                      divisions: 30,
-                                      onChanged: (value) {
-                                        _previewWhiteBalanceTint(value);
-                                      },
-                                      onChangeEnd: (value) =>
-                                          _applyWhiteBalance(tint: value),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              ControlCard(
-                                title: 'Manual focus',
-                                trailing: supportsFocus
-                                    ? Text(
-                                        _manualFocusPosition.toStringAsFixed(2),
-                                        style: const TextStyle(
-                                            color: Colors.white70),
-                                      )
-                                    : const Text(
-                                        'Not supported',
-                                        style: TextStyle(color: Colors.white54),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            child: Column(
+                              children: [
+                                ControlCard(
+                                  title: 'White balance',
+                                  trailing: TextButton(
+                                    onPressed: (_whiteBalanceTemperature !=
+                                                null ||
+                                            _whiteBalanceTint != null)
+                                        ? () => _applyWhiteBalance(reset: true)
+                                        : null,
+                                    child: const Text('Auto'),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      LabeledSlider(
+                                        label:
+                                            'Temperature ${(_whiteBalanceTemperature ?? 5000).round()}K',
+                                        value:
+                                            (_whiteBalanceTemperature ?? 5000)
+                                                .clamp(2500, 7500),
+                                        min: 2500,
+                                        max: 7500,
+                                        divisions: 25,
+                                        onChanged: (value) {
+                                          _previewWhiteBalanceTemperature(
+                                              value);
+                                        },
+                                        onChangeEnd: (value) =>
+                                            _applyWhiteBalance(
+                                                temperature: value),
                                       ),
-                                child: LabeledSlider(
-                                  label: supportsFocus
-                                      ? 'Lens position'
-                                      : 'Lens does not support focus',
-                                  value: _manualFocusPosition.clamp(0.0, 1.0),
-                                  min: 0.0,
-                                  max: 1.0,
-                                  divisions: 50,
-                                  onChanged: supportsFocus
-                                      ? (value) => _previewManualFocus(value)
-                                      : null,
-                                  onChangeEnd: supportsFocus
-                                      ? _setManualFocusPosition
-                                      : null,
+                                      const SizedBox(height: 8),
+                                      LabeledSlider(
+                                        label:
+                                            'Tint ${(_whiteBalanceTint ?? 0).toStringAsFixed(0)}',
+                                        value: (_whiteBalanceTint ?? 0)
+                                            .clamp(-150, 150),
+                                        min: -150,
+                                        max: 150,
+                                        divisions: 30,
+                                        onChanged: (value) {
+                                          _previewWhiteBalanceTint(value);
+                                        },
+                                        onChangeEnd: (value) =>
+                                            _applyWhiteBalance(tint: value),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 10),
-                              ControlCard(
-                                title: 'Capture tuning',
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('Manual'),
-                                    Switch.adaptive(
-                                      value: _useManualCaptureSettings,
-                                      onChanged: _toggleManualCaptureSettings,
-                                    ),
-                                  ],
+                                const SizedBox(height: 10),
+                                ControlCard(
+                                  title: 'Manual focus',
+                                  trailing: supportsFocus
+                                      ? Text(
+                                          _manualFocusPosition
+                                              .toStringAsFixed(2),
+                                          style: const TextStyle(
+                                              color: Colors.white70),
+                                        )
+                                      : const Text(
+                                          'Not supported',
+                                          style:
+                                              TextStyle(color: Colors.white54),
+                                        ),
+                                  child: LabeledSlider(
+                                    label: supportsFocus
+                                        ? 'Lens position'
+                                        : 'Lens does not support focus',
+                                    value: _manualFocusPosition.clamp(0.0, 1.0),
+                                    min: 0.0,
+                                    max: 1.0,
+                                    divisions: 50,
+                                    onChanged: supportsFocus
+                                        ? (value) => _previewManualFocus(value)
+                                        : null,
+                                    onChangeEnd: supportsFocus
+                                        ? _setManualFocusPosition
+                                        : null,
+                                  ),
                                 ),
-                                child: Column(
-                                  children: [
-                                    LabeledSlider(
-                                      label:
-                                          'Exposure ${_exposureDurationMs.toStringAsFixed(0)} ms',
-                                      value: _exposureDurationMs.clamp(1, 500),
-                                      min: 1,
-                                      max: 500,
-                                      divisions: 50,
-                                      onChanged: _useManualCaptureSettings
-                                          ? (value) =>
-                                              _updateExposureValue(value)
-                                          : null,
-                                      onChangeEnd: _useManualCaptureSettings
-                                          ? (value) =>
-                                              _updateExposureValue(value)
-                                          : null,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    LabeledSlider(
-                                      label:
-                                          'ISO ${_isoValue.toStringAsFixed(0)}',
-                                      value: _isoValue.clamp(50, 800),
-                                      min: 50,
-                                      max: 800,
-                                      divisions: 30,
-                                      onChanged: _useManualCaptureSettings
-                                          ? (value) => _updateIsoValue(value)
-                                          : null,
-                                      onChangeEnd: _useManualCaptureSettings
-                                          ? (value) => _updateIsoValue(value)
-                                          : null,
-                                    ),
-                                  ],
+                                const SizedBox(height: 10),
+                                ControlCard(
+                                  title: 'Capture tuning',
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Manual'),
+                                      Switch.adaptive(
+                                        value: _useManualCaptureSettings,
+                                        onChanged: _toggleManualCaptureSettings,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      LabeledSlider(
+                                        label:
+                                            'Exposure ${_exposureDurationMs.toStringAsFixed(0)} ms',
+                                        value:
+                                            _exposureDurationMs.clamp(1, 500),
+                                        min: 1,
+                                        max: 500,
+                                        divisions: 50,
+                                        onChanged: _useManualCaptureSettings
+                                            ? (value) =>
+                                                _updateExposureValue(value)
+                                            : null,
+                                        onChangeEnd: _useManualCaptureSettings
+                                            ? (value) =>
+                                                _updateExposureValue(value)
+                                            : null,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      LabeledSlider(
+                                        label:
+                                            'ISO ${_isoValue.toStringAsFixed(0)}',
+                                        value: _isoValue.clamp(50, 800),
+                                        min: 50,
+                                        max: 800,
+                                        divisions: 30,
+                                        onChanged: _useManualCaptureSettings
+                                            ? (value) => _updateIsoValue(value)
+                                            : null,
+                                        onChangeEnd: _useManualCaptureSettings
+                                            ? (value) => _updateIsoValue(value)
+                                            : null,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 10),
+                                LensPagination(
+                                  controller: _lensPageController,
+                                  lenses: _lenses,
+                                  selectedLensId: _selectedLensId,
+                                  onPageChanged: (index) {
+                                    _switchLensByIndex(index);
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                ShutterControls(
+                                  isCapturing: _isCapturing,
+                                  lastPhoto: _lastPhoto,
+                                  onShutter: _capturePhoto,
+                                  onReload: _loadLenses,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        LensPagination(
-                          controller: _lensPageController,
-                          lenses: _lenses,
-                          selectedLensId: _selectedLensId,
-                          onPageChanged: (index) {
-                            _switchLensByIndex(index);
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        ShutterControls(
-                          isCapturing: _isCapturing,
-                          lastPhoto: _lastPhoto,
-                          onShutter: _capturePhoto,
-                          onReload: _loadLenses,
-                        ),
-                        const SizedBox(height: 16),
                       ],
                     ),
         ),

@@ -1,8 +1,8 @@
 name: auto-assign-author
 
 on:
-  pull_request_target:
-    types: [opened, reopened, ready_for_review]
+  pull_request:
+    types: [opened, reopened]
 
 jobs:
   permissions:
