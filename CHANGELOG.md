@@ -1,3 +1,10 @@
+## 1.0.3
+
+- Improved README documentation  
+- Enhanced Swift implementation and test coverage  
+- Added default features for cameras  
+- Cleaned up unnecessary Swift test files  
+
 ## 1.0.2
 
 - Improved code formatting
