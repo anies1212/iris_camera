@@ -1,13 +1,13 @@
 import 'package:flutter/services.dart';
 
 /// Structured error returned by the camera platform implementation.
-class CameraLensSwitcherException implements Exception {
-  CameraLensSwitcherException(this.code, this.message, [this.details]);
+class IrisCameraException implements Exception {
+  IrisCameraException(this.code, this.message, [this.details]);
 
-  factory CameraLensSwitcherException.fromPlatformException(
+  factory IrisCameraException.fromPlatformException(
     PlatformException error,
   ) {
-    return CameraLensSwitcherException(
+    return IrisCameraException(
       error.code,
       error.message,
       error.details,
@@ -24,5 +24,9 @@ class CameraLensSwitcherException implements Exception {
   final Object? details;
 
   @override
-  String toString() => 'CameraLensSwitcherException($code, $message, $details)';
+  @override
+  String toString() => 'IrisCameraException($code, $message, $details)';
 }
+
+/// Backward-compatible alias for [IrisCameraException].
+typedef CameraLensSwitcherException = IrisCameraException;

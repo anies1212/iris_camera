@@ -10,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'iris_camera_platform_interface.dart';
 import 'photo_capture_options.dart';
 import 'camera_lens_descriptor.dart';
-import 'camera_lens_switcher_exception.dart';
 import 'exposure_mode.dart';
 import 'focus_mode.dart';
 import 'resolution_preset.dart';
@@ -18,6 +17,7 @@ import 'image_stream_frame.dart';
 import 'orientation_event.dart';
 import 'camera_state_event.dart';
 import 'focus_exposure_state_event.dart';
+import 'camera_lens_switcher_exception.dart';
 
 /// Main entry point for interacting with the native camera implementation.
 class IrisCamera {
@@ -247,9 +247,9 @@ class IrisCamera {
     try {
       return await body();
     } on PlatformException catch (error) {
-      throw CameraLensSwitcherException.fromPlatformException(error);
+      throw IrisCameraException.fromPlatformException(error);
     } on FormatException catch (error) {
-      throw CameraLensSwitcherException('invalid_payload', error.message);
+      throw IrisCameraException('invalid_payload', error.message);
     }
   }
 }

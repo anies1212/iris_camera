@@ -45,7 +45,7 @@ void main() {
 
     expect(
       () => plugin.switchLens(CameraLensCategory.wide),
-      throwsA(isA<CameraLensSwitcherException>()),
+      throwsA(isA<IrisCameraException>()),
     );
   });
 

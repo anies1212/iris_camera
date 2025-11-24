@@ -75,7 +75,7 @@ Add the camera usage string to your Info.plist:
 
 Nothing else is required; the plugin automatically requests permission the first time you call `switchLens` or `capturePhoto`.
 
-> Front-facing lenses are currently filtered out of `listAvailableLenses`. The shared preview/capture session mirrors the native output, so supporting front cameras would require a dedicated mirrored preview pipeline to avoid confusing users with flipped feeds. This is tracked for a future release; for now we only expose lenses we can render authentically.
+> Front-facing lenses are included by default. If you want to exclude them, call `listAvailableLenses(includeFrontCameras: false)`.
 
 ---
 
