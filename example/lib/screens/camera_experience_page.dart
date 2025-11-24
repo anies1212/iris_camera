@@ -124,8 +124,9 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
       final bytes = await _camera.capturePhoto(
         options: PhotoCaptureOptions(
           flashMode: _flashMode,
-          exposureDuration:
-              _useManualCaptureSettings ? Duration(milliseconds: _exposureDurationMs.round()) : null,
+          exposureDuration: _useManualCaptureSettings
+              ? Duration(milliseconds: _exposureDurationMs.round())
+              : null,
           iso: _useManualCaptureSettings ? _isoValue : null,
         ),
       );
@@ -231,7 +232,8 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                               zoomFactor: _zoomFactor,
                               onZoomChanged: _setZoom,
                               isSwitchingLens: _isSwitchingLens,
-                              focusIndicatorController: _focusIndicatorController,
+                              focusIndicatorController:
+                                  _focusIndicatorController,
                               supportsFocus: lens?.supportsFocus ?? false,
                               lensName: lens?.category.name ?? '',
                             ),
@@ -244,7 +246,8 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                               ControlCard(
                                 title: 'White balance',
                                 trailing: TextButton(
-                                  onPressed: (_whiteBalanceTemperature != null ||
+                                  onPressed: (_whiteBalanceTemperature !=
+                                              null ||
                                           _whiteBalanceTint != null)
                                       ? () => _applyWhiteBalance(reset: true)
                                       : null,
@@ -256,7 +259,8 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                                     LabeledSlider(
                                       label:
                                           'Temperature ${(_whiteBalanceTemperature ?? 5000).round()}K',
-                                      value: (_whiteBalanceTemperature ?? 5000).clamp(2500, 7500),
+                                      value: (_whiteBalanceTemperature ?? 5000)
+                                          .clamp(2500, 7500),
                                       min: 2500,
                                       max: 7500,
                                       divisions: 25,
@@ -264,13 +268,15 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                                         _previewWhiteBalanceTemperature(value);
                                       },
                                       onChangeEnd: (value) =>
-                                          _applyWhiteBalance(temperature: value),
+                                          _applyWhiteBalance(
+                                              temperature: value),
                                     ),
                                     const SizedBox(height: 8),
                                     LabeledSlider(
                                       label:
                                           'Tint ${(_whiteBalanceTint ?? 0).toStringAsFixed(0)}',
-                                      value: (_whiteBalanceTint ?? 0).clamp(-150, 150),
+                                      value: (_whiteBalanceTint ?? 0)
+                                          .clamp(-150, 150),
                                       min: -150,
                                       max: 150,
                                       divisions: 30,
@@ -289,7 +295,8 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                                 trailing: supportsFocus
                                     ? Text(
                                         _manualFocusPosition.toStringAsFixed(2),
-                                        style: const TextStyle(color: Colors.white70),
+                                        style: const TextStyle(
+                                            color: Colors.white70),
                                       )
                                     : const Text(
                                         'Not supported',
@@ -303,9 +310,12 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                                   min: 0.0,
                                   max: 1.0,
                                   divisions: 50,
-                                  onChanged:
-                                      supportsFocus ? (value) => _previewManualFocus(value) : null,
-                                  onChangeEnd: supportsFocus ? _setManualFocusPosition : null,
+                                  onChanged: supportsFocus
+                                      ? (value) => _previewManualFocus(value)
+                                      : null,
+                                  onChangeEnd: supportsFocus
+                                      ? _setManualFocusPosition
+                                      : null,
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -331,15 +341,18 @@ class _CameraExperiencePageState extends State<CameraExperiencePage> {
                                       max: 500,
                                       divisions: 50,
                                       onChanged: _useManualCaptureSettings
-                                          ? (value) => _updateExposureValue(value)
+                                          ? (value) =>
+                                              _updateExposureValue(value)
                                           : null,
                                       onChangeEnd: _useManualCaptureSettings
-                                          ? (value) => _updateExposureValue(value)
+                                          ? (value) =>
+                                              _updateExposureValue(value)
                                           : null,
                                     ),
                                     const SizedBox(height: 8),
                                     LabeledSlider(
-                                      label: 'ISO ${_isoValue.toStringAsFixed(0)}',
+                                      label:
+                                          'ISO ${_isoValue.toStringAsFixed(0)}',
                                       value: _isoValue.clamp(50, 800),
                                       min: 50,
                                       max: 800,

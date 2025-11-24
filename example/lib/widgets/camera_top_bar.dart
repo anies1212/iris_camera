@@ -36,7 +36,9 @@ class CameraTopBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isSwitching ? 'Reconfiguring lens…' : 'Tap to focus • Swipe to switch lenses',
+                  isSwitching
+                      ? 'Reconfiguring lens…'
+                      : 'Tap to focus • Swipe to switch lenses',
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -64,7 +66,8 @@ class CameraTopBar extends StatelessWidget {
 }
 
 class FlashSelector extends StatelessWidget {
-  const FlashSelector({super.key, required this.value, required this.onChanged});
+  const FlashSelector(
+      {super.key, required this.value, required this.onChanged});
 
   final PhotoFlashMode value;
   final ValueChanged<PhotoFlashMode> onChanged;

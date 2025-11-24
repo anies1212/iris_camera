@@ -76,7 +76,8 @@ class LensCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderColor = isActive ? Colors.white : Colors.white10;
-    final background = isActive ? Colors.white12 : Colors.white.withValues(alpha: 0.06);
+    final background =
+        isActive ? Colors.white12 : Colors.white.withValues(alpha: 0.06);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
