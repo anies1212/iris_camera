@@ -83,6 +83,5 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
           ANDROID_VERBOSE: 'true'
         run: |
-          set -x
           flutter config --enable-android
           flutter build apk --debug --verbose

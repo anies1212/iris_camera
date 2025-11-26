@@ -24,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This example app lists and switches iOS camera lenses, so camera access is required.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Audio is captured with video recordings, so microphone access is required.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

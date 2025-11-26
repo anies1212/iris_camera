@@ -2,6 +2,8 @@ package com.anies1212.iris_camera
 
 import android.content.Context
 import android.view.OrientationEventListener
+import android.os.Handler
+import android.os.Looper
 import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -66,6 +68,7 @@ internal class OrientationStreamHandler(private val context: Context) : EventCha
 
 internal class StateStreamHandler : EventChannel.StreamHandler {
     private var sink: EventChannel.EventSink? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         sink = events
@@ -81,13 +84,14 @@ internal class StateStreamHandler : EventChannel.StreamHandler {
             payload["errorCode"] = error.code
             payload["errorMessage"] = error.message
         }
-        sink?.success(payload)
+        mainHandler.post { sink?.success(payload) }
     }
 }
 
 internal class FocusExposureStreamHandler : EventChannel.StreamHandler {
     private var sink: EventChannel.EventSink? = null
     private val isEmitting = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         sink = events
@@ -98,11 +102,13 @@ internal class FocusExposureStreamHandler : EventChannel.StreamHandler {
     }
 
     fun emit(state: FocusExposureStateNative) {
-        if (isEmitting.compareAndSet(false, true)) {
-            sink?.success(mapOf("state" to state.value))
-            isEmitting.set(false)
-        } else {
-            sink?.success(mapOf("state" to state.value))
+        mainHandler.post {
+            if (isEmitting.compareAndSet(false, true)) {
+                sink?.success(mapOf("state" to state.value))
+                isEmitting.set(false)
+            } else {
+                sink?.success(mapOf("state" to state.value))
+            }
         }
     }
 }

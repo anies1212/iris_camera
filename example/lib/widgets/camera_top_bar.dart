@@ -9,6 +9,7 @@ class CameraTopBar extends StatelessWidget {
     required this.onFlashChanged,
     required this.isSwitching,
     required this.platformVersion,
+    this.onCaptureTap,
   });
 
   final String lensName;
@@ -16,6 +17,7 @@ class CameraTopBar extends StatelessWidget {
   final ValueChanged<PhotoFlashMode> onFlashChanged;
   final bool isSwitching;
   final String? platformVersion;
+  final VoidCallback? onCaptureTap;
 
   @override
   Widget build(BuildContext context) {
@@ -24,35 +26,41 @@ class CameraTopBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lensName,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(color: Colors.white),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isSwitching
-                      ? 'Reconfiguring lens…'
-                      : 'Tap to focus • Swipe to switch lenses',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Colors.white70),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Platform: ${platformVersion ?? 'Loading…'}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: Colors.white60),
-                ),
-              ],
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onCaptureTap,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lensName,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isSwitching
+                        ? 'Reconfiguring lens…'
+                        : onCaptureTap != null
+                            ? 'Tap here to snap a photo'
+                            : 'Tap to focus • Swipe to switch lenses',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Platform: ${platformVersion ?? 'Loading…'}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: Colors.white60),
+                  ),
+                ],
+              ),
             ),
           ),
           FlashSelector(

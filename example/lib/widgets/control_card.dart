@@ -35,7 +35,7 @@ class ControlCard extends StatelessWidget {
                     ?.copyWith(color: Colors.white),
               ),
               const Spacer(),
-              if (trailing != null) trailing!,
+              if (trailing case final trailing?) trailing,
             ],
           ),
           const SizedBox(height: 8),

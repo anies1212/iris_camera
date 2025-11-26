@@ -3,7 +3,7 @@ import Foundation
 import Flutter
 import UIKit
 
-public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate {
+public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate {
   private static let channelName = "iris_camera"
   private static let imageStreamChannelName = "iris_camera/imageStream"
   private static let orientationChannelName = "iris_camera/orientation"
@@ -33,7 +33,7 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: registrar.messenger())
-    let instance = IrisCameraPlugin()
+    let instance = SwiftIrisCameraPlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
 
     let previewFactory = CameraPreviewFactory(sessionProvider: { instance.captureSession })

@@ -8,51 +8,49 @@ class LensPagination extends StatelessWidget {
     required this.lenses,
     required this.selectedLensId,
     required this.onPageChanged,
+    this.onLensTap,
   });
 
   final PageController controller;
   final List<CameraLensDescriptor> lenses;
   final String? selectedLensId;
   final ValueChanged<int> onPageChanged;
+  final void Function(CameraLensDescriptor lens)? onLensTap;
 
   @override
   Widget build(BuildContext context) {
-    if (lenses.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final height =
-            constraints.maxHeight.isFinite ? constraints.maxHeight : 92.0;
-        final clampedHeight = height.clamp(0.0, 120.0);
-        return SizedBox(
-          height: clampedHeight.toDouble(),
-          child: PageView.builder(
-            controller: controller,
-            itemCount: lenses.length,
-            onPageChanged: onPageChanged,
-            physics: const BouncingScrollPhysics(),
-            itemBuilder: (context, index) {
-              final lens = lenses[index];
-              final isActive = lens.id == selectedLensId;
-              return AnimatedScale(
-                duration: const Duration(milliseconds: 200),
-                scale: isActive ? 1.0 : 0.9,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Center(
-                    child: LensCard(
-                      label: _lensLabel(lens),
-                      subtitle: lens.category.name,
-                      isActive: isActive,
-                    ),
+    return SizedBox(
+      height: 60,
+      child: PageView.builder(
+        controller: controller,
+        itemCount: lenses.length,
+        onPageChanged: onPageChanged,
+        physics: const BouncingScrollPhysics(),
+        itemBuilder: (context, index) {
+          final lens = lenses[index];
+          final isActive = lens.id == selectedLensId;
+          return AnimatedScale(
+            duration: const Duration(milliseconds: 200),
+            scale: isActive ? 1.0 : 0.9,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Center(
+                child: GestureDetector(
+                  onTap: isActive && onLensTap != null
+                      ? () => onLensTap!(lens)
+                      : null,
+                  behavior: HitTestBehavior.opaque,
+                  child: _LensCard(
+                    label: _lensLabel(lens),
+                    subtitle: _lensSubtitle(lens),
+                    isActive: isActive,
                   ),
                 ),
-              );
-            },
-          ),
-        );
-      },
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -69,11 +67,20 @@ class LensPagination extends StatelessWidget {
       CameraLensCategory.unknown => 'Lens',
     };
   }
+
+  String _lensSubtitle(CameraLensDescriptor lens) {
+    final position = switch (lens.position) {
+      CameraLensPosition.front => 'Front',
+      CameraLensPosition.back => 'Back',
+      CameraLensPosition.external => 'External',
+      CameraLensPosition.unspecified => 'Unknown',
+    };
+    return '${lens.name} • $position';
+  }
 }
 
-class LensCard extends StatelessWidget {
-  const LensCard({
-    super.key,
+class _LensCard extends StatelessWidget {
+  const _LensCard({
     required this.label,
     required this.subtitle,
     required this.isActive,
@@ -88,39 +95,47 @@ class LensCard extends StatelessWidget {
     final borderColor = isActive ? Colors.white : Colors.white10;
     final background =
         isActive ? Colors.white12 : Colors.white.withValues(alpha: 0.06);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: background,
-        border: Border.all(color: borderColor, width: isActive ? 2 : 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 10,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: Colors.white70),
-          ),
-        ],
+    return SizedBox(
+      width: 210,
+      height: 100,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: background,
+          border: Border.all(color: borderColor, width: isActive ? 2 : 1),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black54,
+              blurRadius: 10,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineMedium
+                  ?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: Colors.white70),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

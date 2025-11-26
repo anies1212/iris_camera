@@ -49,7 +49,7 @@ IrisCameraPreview(
 ---
 
 ## iOS setup
-Add to `ios/Runner/Info.plist`:
+Add to `ios/Runner/Info.plist` (both are required or the app will crash when accessing camera/mic):
 ```xml
 <key>NSCameraUsageDescription</key>
 <string>This app needs the camera to capture photos.</string>

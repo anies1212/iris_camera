@@ -27,8 +27,10 @@ final class FocusExposureStreamHandler: NSObject, FlutterStreamHandler {
   }
 
   func emit(state: FocusExposureStateNative) {
-    sink?([
-      "state": state.rawValue
-    ])
+    DispatchQueue.main.async { [weak self] in
+      self?.sink?([
+        "state": state.rawValue
+      ])
+    }
   }
 }

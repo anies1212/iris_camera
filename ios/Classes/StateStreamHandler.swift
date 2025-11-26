@@ -33,6 +33,8 @@ final class StateStreamHandler: NSObject, FlutterStreamHandler {
       payload["errorCode"] = error.code
       payload["errorMessage"] = error.message ?? error.code
     }
-    sink(payload)
+    DispatchQueue.main.async {
+      sink(payload)
+    }
   }
 }
