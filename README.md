@@ -1,8 +1,8 @@
 # iris_camera
 
-📸 iOS-first camera toolkit for Flutter, powered by AVFoundation. Render the native preview, switch lenses, stream frames, capture photos, tune exposure/white balance/torch/zoom, and listen to lifecycle + orientation + AF/AE state – all from Dart.
+📸 iOS + Android camera toolkit for Flutter, powered by AVFoundation and CameraX. Render the native preview, switch lenses, stream frames, capture photos, tune exposure/white balance/torch/zoom, and listen to lifecycle + orientation + AF/AE state – all from Dart.
 
-> Platform coverage: iOS only for now. Android/Web backends are planned for v2. Other platforms no-op safely.
+> Platform coverage: iOS + Android. Web backend planned for v2. Other platforms no-op safely.
 
 ---
 
@@ -57,6 +57,14 @@ That’s it. Permissions are requested automatically on first use.
 
 > Exclude front cameras by calling `listAvailableLenses(includeFrontCameras: false)`.
 
+## Android setup
+Add the camera permission to your app manifest (the plugin also declares it for you):
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+```
+
+`iris_camera` will prompt for runtime permission automatically before accessing the camera. The preview is rendered via a native `PreviewView`, and tap-to-focus works the same as iOS.
+
 ---
 
 ## API quick reference
@@ -101,7 +109,7 @@ Widget:
 | AF/AE state stream | ✅ | ⚪️ basic focus/exposure mode only |
 | Lifecycle controls | ✅ initialize/pause/resume/dispose + state stream | ✅ (controller init/dispose) |
 | Video recording | ❌ (planned) | ✅ |
-| Android/Web | ❌ (planned v2) | ✅ |
+| Web | ❌ (planned v2) | ✅ |
 
 ---
 

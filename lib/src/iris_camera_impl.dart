@@ -56,6 +56,9 @@ class IrisCamera {
   }
 
   /// Sets focus either to a normalized preview [point] or to a [lensPosition].
+  ///
+  /// On Android, providing [lensPosition] throws `unsupported_feature` because
+  /// manual lens position focus is not available.
   Future<void> setFocus({
     Offset? point,
     double? lensPosition,
@@ -76,6 +79,9 @@ class IrisCamera {
   }
 
   /// Overrides white balance with temperature/tint or resets to auto when omitted.
+  ///
+  /// On Android, providing [temperature] or [tint] throws `unsupported_feature`
+  /// because explicit WB gains are not available; only auto/lock is supported.
   Future<void> setWhiteBalance({
     double? temperature,
     double? tint,

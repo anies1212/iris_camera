@@ -12,7 +12,7 @@ const String _kPreviewViewType = 'iris_camera/preview';
 /// Callback invoked with a tap-to-focus point in normalized preview coords.
 typedef TapToFocusCallback = FutureOr<void> Function(Offset normalizedPoint);
 
-/// Embeds the native iOS camera preview layer and optional focus indicator.
+/// Embeds the native iOS/Android camera preview layer and optional focus indicator.
 class IrisCameraPreview extends StatefulWidget {
   const IrisCameraPreview({
     super.key,
@@ -120,19 +120,29 @@ class _IrisCameraPreviewState extends State<IrisCameraPreview> {
 
   @override
   Widget build(BuildContext context) {
-    Widget preview = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: _kPreviewViewType,
-            hitTestBehavior: widget.hitTestBehavior,
-            onPlatformViewCreated: widget.onViewCreated,
-          )
-        : widget.placeholder ??
+    Widget preview;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        preview = UiKitView(
+          viewType: _kPreviewViewType,
+          hitTestBehavior: widget.hitTestBehavior,
+          onPlatformViewCreated: widget.onViewCreated,
+        );
+      case TargetPlatform.android:
+        preview = AndroidView(
+          viewType: _kPreviewViewType,
+          hitTestBehavior: widget.hitTestBehavior,
+          onPlatformViewCreated: widget.onViewCreated,
+        );
+      default:
+        preview = widget.placeholder ??
             const Center(
               child: Text(
-                'Camera preview is only available on iOS devices.',
+                'Camera preview is only available on iOS/Android devices.',
                 textAlign: TextAlign.center,
               ),
             );
+    }
 
     preview = DecoratedBox(
       decoration: BoxDecoration(color: widget.backgroundColor),

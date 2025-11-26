@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -32,6 +34,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<String?> getPlatformVersion() async {
+    _ensureSupported();
     final version = await methodChannel.invokeMethod<String>(
       IrisMethod.getPlatformVersion.method,
     );
@@ -42,6 +45,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   Future<List<CameraLensDescriptor>> listAvailableLenses({
     bool includeFrontCameras = true,
   }) async {
+    _ensureSupported();
     final rawList = await methodChannel.invokeListMethod<Object?>(
           IrisMethod.listAvailableLenses.method,
           <String, dynamic>{IrisArgKey.includeFront.key: includeFrontCameras},
@@ -55,6 +59,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<CameraLensDescriptor> switchLens(CameraLensCategory category) async {
+    _ensureSupported();
     final response = await methodChannel.invokeMethod<Object?>(
       IrisMethod.switchLens.method,
       <String, dynamic>{IrisArgKey.category.key: category.name},
@@ -65,6 +70,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<Uint8List> capturePhoto(PhotoCaptureOptions options) async {
+    _ensureSupported();
     final bytes = await methodChannel.invokeMethod<Uint8List>(
       IrisMethod.takePhoto.method,
       options.toMap(),
@@ -83,6 +89,13 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     Offset? point,
     double? lensPosition,
   }) async {
+    if (Platform.isAndroid && lensPosition != null) {
+      throw PlatformException(
+        code: 'unsupported_feature',
+        message: 'lensPosition focus is not supported on Android.',
+      );
+    }
+    _ensureSupported();
     final args = <String, dynamic>{};
     if (point != null) {
       args[IrisArgKey.x.key] = point.dx;
@@ -96,6 +109,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> setZoom(double zoomFactor) async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(
       IrisMethod.setZoom.method,
       <String, dynamic>{IrisArgKey.zoomFactor.key: zoomFactor},
@@ -107,6 +121,14 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     double? temperature,
     double? tint,
   }) async {
+    if (Platform.isAndroid && (temperature != null || tint != null)) {
+      throw PlatformException(
+        code: 'unsupported_feature',
+        message:
+            'Explicit white balance temperature/tint is not supported on Android.',
+      );
+    }
+    _ensureSupported();
     final args = <String, dynamic>{};
     if (temperature != null) {
       args[IrisArgKey.temperature.key] = temperature;
@@ -120,6 +142,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> setExposureMode(ExposureMode mode) async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(
       IrisMethod.setExposureMode.method,
       <String, dynamic>{
@@ -133,6 +156,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<ExposureMode> getExposureMode() async {
+    _ensureSupported();
     final mode = await methodChannel
         .invokeMethod<String>(IrisMethod.getExposureMode.method);
     return mode == 'locked' ? ExposureMode.locked : ExposureMode.auto;
@@ -140,6 +164,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> setExposurePoint(Offset point) async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(
       IrisMethod.setExposurePoint.method,
       <String, dynamic>{
@@ -151,6 +176,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<double> getMinExposureOffset() async {
+    _ensureSupported();
     final value = await methodChannel
         .invokeMethod<num>(IrisMethod.getMinExposureOffset.method);
     return (value ?? 0).toDouble();
@@ -158,6 +184,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<double> getMaxExposureOffset() async {
+    _ensureSupported();
     final value = await methodChannel
         .invokeMethod<num>(IrisMethod.getMaxExposureOffset.method);
     return (value ?? 0).toDouble();
@@ -165,6 +192,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<double> setExposureOffset(double offset) async {
+    _ensureSupported();
     final value = await methodChannel.invokeMethod<num>(
       IrisMethod.setExposureOffset.method,
       <String, dynamic>{IrisArgKey.offset.key: offset},
@@ -174,6 +202,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<double> getExposureOffset() async {
+    _ensureSupported();
     final value = await methodChannel
         .invokeMethod<num>(IrisMethod.getExposureOffset.method);
     return (value ?? 0).toDouble();
@@ -181,6 +210,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<double> getExposureOffsetStepSize() async {
+    _ensureSupported();
     final value = await methodChannel
         .invokeMethod<num>(IrisMethod.getExposureOffsetStepSize.method);
     return (value ?? 0.1).toDouble();
@@ -188,6 +218,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> setResolutionPreset(ResolutionPreset preset) async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(
       IrisMethod.setResolutionPreset.method,
       <String, dynamic>{IrisArgKey.preset.key: preset.name},
@@ -197,6 +228,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   @override
   Stream<IrisImageFrame> get imageStream => _imageStream ??=
           _imageStreamChannel.receiveBroadcastStream().map((event) {
+        _ensureSupported();
         final map = _coerceMap(event);
         return IrisImageFrame.fromMap(map);
       });
@@ -204,6 +236,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   @override
   Stream<OrientationEvent> get orientationStream => _orientationStream ??=
           _orientationChannel.receiveBroadcastStream().map((event) {
+        _ensureSupported();
         final map = _coerceMap(event);
         return OrientationEvent.fromMap(map);
       });
@@ -211,6 +244,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   @override
   Stream<CameraStateEvent> get stateStream =>
       _stateStream ??= _stateChannel.receiveBroadcastStream().map((event) {
+        _ensureSupported();
         final map = _coerceMap(event);
         return CameraStateEvent.fromMap(map);
       });
@@ -219,22 +253,26 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   Stream<FocusExposureStateEvent> get focusExposureStateStream =>
       _focusExposureStateStream ??=
           _focusExposureStateChannel.receiveBroadcastStream().map((event) {
+        _ensureSupported();
         final map = _coerceMap(event);
         return FocusExposureStateEvent.fromMap(map);
       });
 
   @override
   Future<void> startImageStream() async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(IrisMethod.startImageStream.method);
   }
 
   @override
   Future<void> stopImageStream() async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(IrisMethod.stopImageStream.method);
   }
 
   @override
   Future<void> setTorch(bool enabled) async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(
       IrisMethod.setTorch.method,
       <String, dynamic>{IrisArgKey.enabled.key: enabled},
@@ -243,6 +281,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> setFocusMode(FocusMode mode) async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(
       IrisMethod.setFocusMode.method,
       <String, dynamic>{
@@ -256,6 +295,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<FocusMode> getFocusMode() async {
+    _ensureSupported();
     final mode = await methodChannel
         .invokeMethod<String>(IrisMethod.getFocusMode.method);
     return mode == 'locked' ? FocusMode.locked : FocusMode.auto;
@@ -263,6 +303,7 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> setFrameRateRange({double? minFps, double? maxFps}) async {
+    _ensureSupported();
     final args = <String, dynamic>{};
     if (minFps != null) {
       args[IrisArgKey.minFps.key] = minFps;
@@ -279,21 +320,25 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
 
   @override
   Future<void> initialize() async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(IrisMethod.initialize.method);
   }
 
   @override
   Future<void> pauseSession() async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(IrisMethod.pauseSession.method);
   }
 
   @override
   Future<void> resumeSession() async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(IrisMethod.resumeSession.method);
   }
 
   @override
   Future<void> disposeSession() async {
+    _ensureSupported();
     await methodChannel.invokeMethod<void>(IrisMethod.disposeSession.method);
   }
 
@@ -309,5 +354,14 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
       });
     }
     throw FormatException('Expected a map payload but received $payload');
+  }
+
+  void _ensureSupported() {
+    if (!Platform.isIOS && !Platform.isAndroid) {
+      throw PlatformException(
+        code: 'unsupported_platform',
+        message: 'iris_camera is only supported on iOS and Android.',
+      );
+    }
   }
 }

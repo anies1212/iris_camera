@@ -37,6 +37,9 @@ flutter:
   # adding or updating assets for this project.
   plugin:
     platforms:
+      android:
+        package: com.anies1212.iris_camera
+        pluginClass: IrisCameraPlugin
       ios:
         pluginClass: IrisCameraPlugin
 
