@@ -33,6 +33,12 @@ enum IrisMethod {
   /// Captures a still photo.
   takePhoto('takePhoto'),
 
+  /// Starts recording a video.
+  startVideoRecording('startVideoRecording'),
+
+  /// Stops recording and returns the video file path.
+  stopVideoRecording('stopVideoRecording'),
+
   /// Sets a focus point or lens position.
   setFocus('setFocus'),
 
@@ -176,6 +182,12 @@ enum IrisArgKey {
 
   /// Maximum frames per second.
   maxFps('maxFps'),
+
+  /// File path for output video.
+  filePath('filePath'),
+
+  /// Whether to enable audio capture.
+  enableAudio('enableAudio'),
 
   /// State label emitted from platform.
   state('state'),

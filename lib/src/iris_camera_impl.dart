@@ -55,6 +55,30 @@ class IrisCamera {
     );
   }
 
+  /// Starts recording a video to a file.
+  ///
+  /// Returns the file path used for the recording. Pass [filePath] to control
+  /// the output location; otherwise a temporary file is used. Set
+  /// [enableAudio] to false to record silently (default is true).
+  Future<String> startVideoRecording({
+    String? filePath,
+    bool enableAudio = true,
+  }) {
+    return _wrapPlatformExceptions(
+      () => IrisCameraPlatform.instance.startVideoRecording(
+        filePath: filePath,
+        enableAudio: enableAudio,
+      ),
+    );
+  }
+
+  /// Stops the active video recording and returns the saved file path.
+  Future<String> stopVideoRecording() {
+    return _wrapPlatformExceptions(
+      () => IrisCameraPlatform.instance.stopVideoRecording(),
+    );
+  }
+
   /// Sets focus either to a normalized preview [point] or to a [lensPosition].
   ///
   /// On Android, providing [lensPosition] throws `unsupported_feature` because

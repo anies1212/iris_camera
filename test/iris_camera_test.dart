@@ -89,6 +89,15 @@ class _MockIrisCameraPlatform
   }
 
   @override
+  Future<String> startVideoRecording(
+      {String? filePath, bool enableAudio = true}) async {
+    return filePath ?? '/tmp/vid.mp4';
+  }
+
+  @override
+  Future<String> stopVideoRecording() async => '/tmp/vid.mp4';
+
+  @override
   Future<void> setFocus({Offset? point, double? lensPosition}) async {}
 
   @override
@@ -191,6 +200,14 @@ class _ThrowingSwitchPlatform
   Future<Uint8List> capturePhoto(PhotoCaptureOptions options) async {
     throw PlatformException(code: 'photo_capture_failed');
   }
+
+  @override
+  Future<String> startVideoRecording(
+          {String? filePath, bool enableAudio = true}) async =>
+      '/tmp/vid.mp4';
+
+  @override
+  Future<String> stopVideoRecording() async => '/tmp/vid.mp4';
 
   @override
   Future<void> setFocus({Offset? point, double? lensPosition}) async {}

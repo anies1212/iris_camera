@@ -47,8 +47,7 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
     private val permissionListener =
         PluginRegistry.RequestPermissionsResultListener { requestCode, _, grantResults ->
             if (requestCode == REQUEST_CODE_CAMERA) {
-                val granted =
-                    grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
                 permissionWaiters.forEach { it.complete(granted) }
                 permissionWaiters.clear()
                 true
@@ -130,6 +129,23 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
                 } else {
                     result.success(bytes)
                 }
+            }
+
+            "startVideoRecording" -> {
+                val enableAudio = call.argument<Boolean>("enableAudio") ?: true
+                launchWithPermission(result, requireAudio = enableAudio) {
+                    val filePath = call.argument<String>("filePath")
+                    val path = cameraController?.startVideoRecording(
+                        filePath = filePath,
+                        enableAudio = enableAudio,
+                    )
+                    result.success(path)
+                }
+            }
+
+            "stopVideoRecording" -> launchWithPermission(result) {
+                val path = cameraController?.stopVideoRecording()
+                result.success(path)
             }
 
             "setFocus" -> launchWithPermission(result) {
@@ -259,14 +275,18 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
         }
     }
 
-    private fun launchWithPermission(result: MethodChannel.Result, block: suspend () -> Unit) {
-        scope.launch {
-            val granted = ensurePermission()
-            if (!granted) {
-                result.error(
-                    "camera_permission_denied",
-                    "Camera permission not granted.",
-                    null,
+  private fun launchWithPermission(
+    result: MethodChannel.Result,
+    requireAudio: Boolean = false,
+    block: suspend () -> Unit,
+  ) {
+    scope.launch {
+      val granted = ensurePermission(requireAudio)
+      if (!granted) {
+        result.error(
+          "camera_permission_denied",
+          "Camera permission not granted.",
+          null,
                 )
                 return@launch
             }
@@ -286,21 +306,27 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
         }
     }
 
-    private suspend fun ensurePermission(): Boolean {
-        val ctx = activity ?: applicationContext ?: return false
-        val granted =
-            ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        if (granted) return true
-        if (permissionWaiters.isNotEmpty()) {
-            return permissionWaiters.last().await()
-        }
-        val currentActivity = activity
-        if (currentActivity == null) return false
-        val deferred = CompletableDeferred<Boolean>()
-        permissionWaiters.add(deferred)
-        ActivityCompat.requestPermissions(currentActivity, arrayOf(Manifest.permission.CAMERA), REQUEST_CODE_CAMERA)
-        return deferred.await()
+  private suspend fun ensurePermission(requireAudio: Boolean): Boolean {
+    val ctx = activity ?: applicationContext ?: return false
+    val cameraGranted =
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    val audioGranted =
+        !requireAudio || ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    if (cameraGranted && audioGranted) return true
+    if (permissionWaiters.isNotEmpty()) {
+      return permissionWaiters.last().await()
     }
+    val currentActivity = activity
+    if (currentActivity == null) return false
+    val deferred = CompletableDeferred<Boolean>()
+    permissionWaiters.add(deferred)
+    val permissions = mutableListOf(Manifest.permission.CAMERA)
+    if (requireAudio) {
+      permissions.add(Manifest.permission.RECORD_AUDIO)
+    }
+    ActivityCompat.requestPermissions(currentActivity, permissions.toTypedArray(), REQUEST_CODE_CAMERA)
+    return deferred.await()
+  }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)

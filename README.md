@@ -1,6 +1,6 @@
 # iris_camera
 
-📸 iOS + Android camera toolkit for Flutter, powered by AVFoundation and CameraX. Render the native preview, switch lenses, stream frames, capture photos, tune exposure/white balance/torch/zoom, and listen to lifecycle + orientation + AF/AE state – all from Dart.
+📸 iOS + Android camera toolkit for Flutter, powered by AVFoundation and CameraX. Render the native preview, switch lenses, stream frames, capture photos, **record video**, tune exposure/white balance/torch/zoom, and listen to lifecycle + orientation + AF/AE state – all from Dart.
 
 > Platform coverage: iOS + Android. Web backend planned for v2. Other platforms no-op safely.
 
@@ -13,6 +13,7 @@
 - 🎛️ Pro controls – focus mode/point, exposure mode/point/EV, white balance, frame rate range, torch, zoom, resolution presets.
 - 📡 Streams – live BGRA image stream, orientation stream, lifecycle state stream, AF/AE state stream.
 - 🔧 Lifecycle – explicit `initialize/pause/resume/dispose` and structured errors via `IrisCameraException`.
+- 🎥 Video – start/stop file-based recording (iOS/Android), optional audio.
 
 ---
 
@@ -52,6 +53,8 @@ Add to `ios/Runner/Info.plist`:
 ```xml
 <key>NSCameraUsageDescription</key>
 <string>This app needs the camera to capture photos.</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>This app needs the microphone for recording video with audio.</string>
 ```
 That’s it. Permissions are requested automatically on first use.
 
@@ -61,17 +64,21 @@ That’s it. Permissions are requested automatically on first use.
 Add the camera permission to your app manifest (the plugin also declares it for you):
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
+<!-- Needed for video with audio -->
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
 
 `iris_camera` will prompt for runtime permission automatically before accessing the camera. The preview is rendered via a native `PreviewView`, and tap-to-focus works the same as iOS.
 
----
+--- 
 
 ## API quick reference
 Key methods:
 - `listAvailableLenses({includeFrontCameras})` → `List<CameraLensDescriptor>`
 - `switchLens(CameraLensCategory category)` → `CameraLensDescriptor`
 - `capturePhoto({PhotoCaptureOptions options})` → `Uint8List`
+- `startVideoRecording({filePath, enableAudio})` → `String path`
+- `stopVideoRecording()` → `String path`
 - Focus: `setFocus(point/lensPosition)`, `setFocusMode`, `focusExposureStateStream`
 - Exposure: `setExposureMode`, `setExposurePoint`, `setExposureOffset`, `getMin/MaxExposureOffset`, `getExposureOffsetStepSize`
 - Zoom/torch/WB: `setZoom`, `setTorch`, `setWhiteBalance`
@@ -108,7 +115,7 @@ Widget:
 | Orientation stream | ✅ device/video | ✅ |
 | AF/AE state stream | ✅ | ⚪️ basic focus/exposure mode only |
 | Lifecycle controls | ✅ initialize/pause/resume/dispose + state stream | ✅ (controller init/dispose) |
-| Video recording | ❌ (planned) | ✅ |
+| Video recording | ✅ (iOS/Android) | ✅ |
 | Web | ❌ (planned v2) | ✅ |
 
 ---

@@ -46,6 +46,19 @@ abstract class IrisCameraPlatform extends PlatformInterface {
     throw UnimplementedError('capturePhoto() has not been implemented.');
   }
 
+  /// Starts recording a video to a file and returns the file path.
+  Future<String> startVideoRecording({
+    String? filePath,
+    bool enableAudio = true,
+  }) {
+    throw UnimplementedError('startVideoRecording() has not been implemented.');
+  }
+
+  /// Stops an active video recording and returns the saved file path.
+  Future<String> stopVideoRecording() {
+    throw UnimplementedError('stopVideoRecording() has not been implemented.');
+  }
+
   Future<void> setFocus({
     Offset? point,
     double? lensPosition,

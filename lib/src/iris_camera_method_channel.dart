@@ -85,6 +85,42 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   }
 
   @override
+  Future<String> startVideoRecording({
+    String? filePath,
+    bool enableAudio = true,
+  }) async {
+    _ensureSupported();
+    final path = await methodChannel.invokeMethod<String>(
+      IrisMethod.startVideoRecording.method,
+      <String, dynamic>{
+        if (filePath != null) IrisArgKey.filePath.key: filePath,
+        IrisArgKey.enableAudio.key: enableAudio,
+      },
+    );
+    if (path == null) {
+      throw PlatformException(
+        code: 'video_start_failed',
+        message: 'Platform returned no video path.',
+      );
+    }
+    return path;
+  }
+
+  @override
+  Future<String> stopVideoRecording() async {
+    _ensureSupported();
+    final path = await methodChannel
+        .invokeMethod<String>(IrisMethod.stopVideoRecording.method);
+    if (path == null) {
+      throw PlatformException(
+        code: 'video_stop_failed',
+        message: 'Platform did not return a video path.',
+      );
+    }
+    return path;
+  }
+
+  @override
   Future<void> setFocus({
     Offset? point,
     double? lensPosition,

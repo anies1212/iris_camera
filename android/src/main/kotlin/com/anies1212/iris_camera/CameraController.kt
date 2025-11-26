@@ -11,8 +11,8 @@ import android.graphics.PixelFormat
 import android.util.Range
 import android.util.Size
 import androidx.camera.camera2.interop.Camera2CameraControl
-import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -29,12 +29,22 @@ import androidx.camera.view.PreviewView
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.PendingRecording
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.roundToInt
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.CompletableDeferred
 
 internal class CameraController(
     private val context: Context,
@@ -49,6 +59,11 @@ internal class CameraController(
     private var preview: Preview? = null
     private var imageCapture: ImageCapture? = null
     private var imageAnalysis: ImageAnalysis? = null
+    private var recorder: Recorder? = null
+    private var videoCapture: VideoCapture<Recorder>? = null
+    private var activeRecording: Recording? = null
+    private var activeRecordingPath: String? = null
+    private var pendingRecordingResult: CompletableDeferred<String>? = null
     private var previewView: PreviewView? = null
     private var selectedLensId: String? = null
     private var selectedDescriptor: CameraLensDescriptorNative? = null
@@ -152,6 +167,7 @@ internal class CameraController(
 
     suspend fun disposeSession() {
         cameraProvider?.unbindAll()
+        activeRecording?.stop()
         camera = null
         preview = null
         imageCapture = null
@@ -185,6 +201,54 @@ internal class CameraController(
             camera2?.setCaptureRequestOptions(options.build())
         }
         return suspendCancellableTakePicture(capture)
+    }
+
+    suspend fun startVideoRecording(filePath: String?, enableAudio: Boolean): String {
+        ensureInitialized()
+        if (activeRecording != null) {
+            throw IllegalStateException("A recording is already in progress.")
+        }
+        if (videoCapture == null) {
+            bindUseCases()
+        }
+        val capture = videoCapture ?: throw IllegalStateException("VideoCapture is not ready")
+        val outputFile = if (filePath != null) {
+            File(filePath)
+        } else {
+            File(context.cacheDir, "iris_video_${System.currentTimeMillis()}.mp4")
+        }
+        outputFile.parentFile?.mkdirs()
+        val outputOptions = FileOutputOptions.Builder(outputFile).build()
+        val result = CompletableDeferred<String>()
+        pendingRecordingResult = result
+        val recording = capture.output.prepareRecording(context, outputOptions).apply {
+            if (enableAudio) {
+                withAudioEnabled()
+            }
+        }.start(executor) { event ->
+            if (event is VideoRecordEvent.Finalize) {
+                if (event.hasError()) {
+                    pendingRecordingResult?.completeExceptionally(
+                        IllegalStateException("Video recording failed: ${event.error}")
+                    )
+                } else {
+                    pendingRecordingResult?.complete(outputFile.absolutePath)
+                }
+                pendingRecordingResult = null
+                activeRecording = null
+                activeRecordingPath = null
+            }
+        }
+        activeRecording = recording
+        activeRecordingPath = outputFile.absolutePath
+        return outputFile.absolutePath
+    }
+
+    suspend fun stopVideoRecording(): String {
+        val recording = activeRecording ?: throw IllegalStateException("No active recording to stop.")
+        val result = pendingRecordingResult ?: CompletableDeferred<String>().also { pendingRecordingResult = it }
+        recording.stop()
+        return result.await()
     }
 
     suspend fun setFocus(point: android.graphics.PointF?, lensPosition: Double?) {
@@ -349,6 +413,17 @@ internal class CameraController(
         ResolutionPresetNative.max -> null
     }
 
+    private fun qualitySelectorForPreset(preset: ResolutionPresetNative): QualitySelector {
+        return when (preset) {
+            ResolutionPresetNative.low,
+            ResolutionPresetNative.medium -> QualitySelector.from(Quality.SD)
+            ResolutionPresetNative.high -> QualitySelector.from(Quality.HD)
+            ResolutionPresetNative.veryHigh -> QualitySelector.from(Quality.FHD)
+            ResolutionPresetNative.ultraHigh -> QualitySelector.from(Quality.UHD)
+            ResolutionPresetNative.max -> QualitySelector.from(Quality.HIGHEST)
+        }
+    }
+
     private suspend fun bindUseCases() {
         ensureInitialized()
         val provider = cameraProvider ?: return
@@ -396,6 +471,9 @@ internal class CameraController(
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
             .build()
+        val qualitySelector = qualitySelectorForPreset(resolutionPreset)
+        recorder = Recorder.Builder().setQualitySelector(qualitySelector).build()
+        videoCapture = VideoCapture.withOutput(recorder!!)
 
         val analysisUseCase = if (isStreaming) {
             analysisBuilder
@@ -426,7 +504,7 @@ internal class CameraController(
         camera = provider.bindToLifecycle(
             lifecycleOwner,
             selector,
-            *listOfNotNull(previewUseCase, captureUseCase, analysisUseCase).toTypedArray(),
+            *listOfNotNull(previewUseCase, captureUseCase, analysisUseCase, videoCapture).toTypedArray(),
         )
 
         previewView?.let { previewUseCase.setSurfaceProvider(it.surfaceProvider) }

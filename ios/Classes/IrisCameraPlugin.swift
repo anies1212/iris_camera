@@ -3,7 +3,7 @@ import Foundation
 import Flutter
 import UIKit
 
-public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AVCaptureVideoDataOutputSampleBufferDelegate {
+public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate {
   private static let channelName = "iris_camera"
   private static let imageStreamChannelName = "iris_camera/imageStream"
   private static let orientationChannelName = "iris_camera/orientation"
@@ -13,11 +13,14 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
   private let sessionQueue = DispatchQueue(label: "iris_camera.session")
   private let captureSession = AVCaptureSession()
   private let photoOutput = AVCapturePhotoOutput()
+  private let movieOutput = AVCaptureMovieFileOutput()
   private let videoOutputQueue = DispatchQueue(label: "iris_camera.videoOutput")
   private let videoDataOutput = AVCaptureVideoDataOutput()
   private var currentInput: AVCaptureDeviceInput?
+  private var audioInput: AVCaptureDeviceInput?
   private var selectedLensID: String?
   private var pendingPhotoCapture: PhotoCaptureDelegate?
+  private var pendingVideoResult: FlutterResult?
   private var currentSessionPreset: AVCaptureSession.Preset = .high
   private var imageStreamSink: FlutterEventSink?
   private var isStreaming = false
@@ -26,6 +29,7 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
   private let focusExposureStreamHandler = FocusExposureStreamHandler()
   private var isInitialized = false
   private var isPaused = false
+  private var isRecordingVideo = false
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: registrar.messenger())
@@ -70,6 +74,10 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
       switchLens(arguments: call.arguments, result: result)
     case "takePhoto":
       takePhoto(arguments: call.arguments, result: result)
+    case "startVideoRecording":
+      startVideoRecording(arguments: call.arguments, result: result)
+    case "stopVideoRecording":
+      stopVideoRecording(result: result)
     case "setFocus":
       setFocus(arguments: call.arguments, result: result)
     case "setZoom":
@@ -339,6 +347,24 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
     }
   }
 
+  private func ensureAudioAuthorization(completion: @escaping (Result<Void, CameraSwitchError>) -> Void) {
+    let status = AVCaptureDevice.authorizationStatus(for: .audio)
+    switch status {
+    case .authorized:
+      completion(.success(()))
+    case .notDetermined:
+      AVCaptureDevice.requestAccess(for: .audio) { granted in
+        if granted {
+          completion(.success(()))
+        } else {
+          completion(.failure(.notAuthorized))
+        }
+      }
+    default:
+      completion(.failure(.notAuthorized))
+    }
+  }
+
   private func startSessionIfNeeded() {
     guard !captureSession.isRunning else { return }
     captureSession.startRunning()
@@ -373,6 +399,31 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
     }
   }
 
+  private func configureMovieOutput(enableAudio: Bool) throws {
+    captureSession.beginConfiguration()
+    if enableAudio {
+      try attachAudioInputIfNeeded()
+    } else if let audioInput {
+      captureSession.removeInput(audioInput)
+      self.audioInput = nil
+    }
+    if !captureSession.outputs.contains(where: { $0 === movieOutput }), captureSession.canAddOutput(movieOutput) {
+      captureSession.addOutput(movieOutput)
+    }
+    movieOutput.connection(with: .video)?.videoOrientation = .portrait
+    captureSession.commitConfiguration()
+  }
+
+  private func attachAudioInputIfNeeded() throws {
+    if audioInput != nil { return }
+    guard let audioDevice = AVCaptureDevice.default(for: .audio) else { return }
+    let input = try AVCaptureDeviceInput(device: audioDevice)
+    if captureSession.canAddInput(input) {
+      captureSession.addInput(input)
+      audioInput = input
+    }
+  }
+
   // MARK: Capture
 
   private func takePhoto(arguments: Any?, result: @escaping FlutterResult) {
@@ -389,6 +440,72 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
           self.capturePhoto(arguments: arguments, result: result)
         }
       }
+    }
+  }
+
+  private func startVideoRecording(arguments: Any?, result: @escaping FlutterResult) {
+    if isRecordingVideo {
+      result(FlutterError(code: "video_already_recording", message: "A video recording is already in progress.", details: nil))
+      return
+    }
+    let args = arguments as? [String: Any]
+    let enableAudio = args?["enableAudio"] as? Bool ?? true
+    let path = args?["filePath"] as? String ?? "\(NSTemporaryDirectory())iris_video_\(UUID().uuidString).mov"
+
+    let beginRecording: () -> Void = { [weak self] in
+      guard let self else { return }
+      self.sessionQueue.async {
+        do {
+          try self.configureMovieOutput(enableAudio: enableAudio)
+          let url = URL(fileURLWithPath: path)
+          if FileManager.default.fileExists(atPath: path) {
+            try? FileManager.default.removeItem(at: url)
+          }
+          self.isRecordingVideo = true
+          self.movieOutput.startRecording(to: url, recordingDelegate: self)
+          self.startSessionIfNeeded()
+          DispatchQueue.main.async { result(path) }
+        } catch {
+          DispatchQueue.main.async {
+            result(FlutterError(code: "video_start_failed", message: error.localizedDescription, details: nil))
+          }
+        }
+      }
+    }
+
+    let handleAuthResult: (Result<Void, CameraSwitchError>) -> Void = { authResult in
+      switch authResult {
+      case .failure(let error):
+        DispatchQueue.main.async { result(error.flutterError) }
+      case .success:
+        if enableAudio {
+          self.ensureAudioAuthorization { audioResult in
+            switch audioResult {
+            case .failure(let error):
+              DispatchQueue.main.async { result(error.flutterError) }
+            case .success:
+              beginRecording()
+            }
+          }
+        } else {
+          beginRecording()
+        }
+      }
+    }
+
+    ensureAuthorization(completion: handleAuthResult)
+  }
+
+  private func stopVideoRecording(result: @escaping FlutterResult) {
+    sessionQueue.async {
+      guard self.movieOutput.isRecording else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "no_active_recording", message: "No active video recording.", details: nil))
+        }
+        return
+      }
+      self.pendingVideoResult = result
+      self.movieOutput.stopRecording()
     }
   }
 
@@ -1122,16 +1239,28 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
   private func disposeSession(result: @escaping FlutterResult) {
     sessionQueue.async {
       self.captureSession.stopRunning()
+      if self.movieOutput.isRecording {
+        self.movieOutput.stopRecording()
+      }
       if let input = self.currentInput {
         self.captureSession.removeInput(input)
       }
+      if let audioInput = self.audioInput {
+        self.captureSession.removeInput(audioInput)
+      }
       if self.captureSession.outputs.contains(where: { $0 === self.photoOutput }) {
         self.captureSession.removeOutput(self.photoOutput)
+      }
+      if self.captureSession.outputs.contains(where: { $0 === self.movieOutput }) {
+        self.captureSession.removeOutput(self.movieOutput)
       }
       if self.captureSession.outputs.contains(where: { $0 === self.videoDataOutput }) {
         self.captureSession.removeOutput(self.videoDataOutput)
       }
       self.currentInput = nil
+      self.audioInput = nil
+      self.pendingVideoResult = nil
+      self.isRecordingVideo = false
       self.selectedLensID = nil
       self.isInitialized = false
       self.isPaused = false
@@ -1179,6 +1308,30 @@ public class IrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandler, AV
       "bytesPerRow": bytesPerRow,
       "format": "bgra8888",
     ])
+  }
+
+  // MARK: AVCaptureFileOutputRecordingDelegate
+
+  public func fileOutput(
+    _ output: AVCaptureFileOutput,
+    didFinishRecordingTo outputFileURL: URL,
+    from connections: [AVCaptureConnection],
+    error: Error?
+  ) {
+    sessionQueue.async {
+      self.isRecordingVideo = false
+      let callback = self.pendingVideoResult
+      self.pendingVideoResult = nil
+      if let error {
+        DispatchQueue.main.async {
+          callback?(FlutterError(code: "video_recording_failed", message: error.localizedDescription, details: nil))
+        }
+        return
+      }
+      DispatchQueue.main.async {
+        callback?(outputFileURL.path)
+      }
+    }
   }
 }
 

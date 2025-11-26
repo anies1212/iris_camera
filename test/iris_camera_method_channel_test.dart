@@ -56,6 +56,10 @@ void main() {
       IrisMethod.pauseSession.method: (_) => null,
       IrisMethod.resumeSession.method: (_) => null,
       IrisMethod.disposeSession.method: (_) => null,
+      IrisMethod.startVideoRecording.method: (call) =>
+          (call.arguments as Map<Object?, Object?>)['filePath'] ??
+          '/tmp/vid.mp4',
+      IrisMethod.stopVideoRecording.method: (_) => '/tmp/vid.mp4',
     };
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -120,6 +124,28 @@ void main() {
     await platform.setZoom(2.5);
     expect(lastCall?.method, IrisMethod.setZoom.method);
     expect(lastCall?.arguments, {'zoomFactor': 2.5});
+  },
+      skip: isMobilePlatform
+          ? null
+          : 'Method channel only available on iOS/Android.');
+
+  test('start/stop video recording', () async {
+    lastCall = null;
+    final startPath = await platform.startVideoRecording(
+      filePath: '/tmp/custom.mp4',
+      enableAudio: false,
+    );
+    expect(startPath, '/tmp/custom.mp4');
+    expect(lastCall?.method, IrisMethod.startVideoRecording.method);
+    expect(
+      lastCall?.arguments,
+      {'filePath': '/tmp/custom.mp4', 'enableAudio': false},
+    );
+
+    lastCall = null;
+    final stopPath = await platform.stopVideoRecording();
+    expect(stopPath, '/tmp/vid.mp4');
+    expect(lastCall?.method, IrisMethod.stopVideoRecording.method);
   },
       skip: isMobilePlatform
           ? null
