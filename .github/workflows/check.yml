@@ -56,6 +56,12 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # 5.0.1
 
+      - name: Set up Java 17 for Android build
+        uses: actions/setup-java@8df1039502a15bceb9433410b1a100fbe190c53b # v4.2.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - uses: wasabeef/import-asdf-tool-versions-action@d0271ba3d7b75e5861889c6923e898190e3a7383 # v1.1.0
         id: tool-versions
 
@@ -73,4 +79,10 @@ jobs:
 
       - name: Build plugin for Android (APK)
         working-directory: example
-        run: flutter build apk --debug
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          ANDROID_VERBOSE: 'true'
+        run: |
+          set -x
+          flutter config --enable-android
+          flutter build apk --debug --verbose
