@@ -7,10 +7,12 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.util.Log
+import android.graphics.PixelFormat
 import android.util.Range
 import android.util.Size
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -266,9 +268,8 @@ internal class CameraController(
         val controller = camera?.cameraControl ?: return
         val view = previewView ?: return
         val meteringPoint = view.meteringPointFactory.createPoint(
-            point.x * view.width,
-            point.y * view.height,
-            FocusMeteringAction.FLAG_AE,
+            point.x * view.width.toFloat(),
+            point.y * view.height.toFloat(),
         )
         val action = FocusMeteringAction.Builder(meteringPoint, FocusMeteringAction.FLAG_AE).build()
         controller.startFocusAndMetering(action)
@@ -356,7 +357,11 @@ internal class CameraController(
             ?: throw IllegalStateException("No lifecycle owner available for camera binding.")
         val selector = if (lensId != null) {
             CameraSelector.Builder()
-                .addCameraFilter { cameras -> cameras.filter { it.cameraInfo.cameraId == lensId } }
+                .addCameraFilter { cameras ->
+                    cameras.filter { info ->
+                        Camera2CameraInfo.from(info).cameraId == lensId
+                    }
+                }
                 .build()
         } else {
             CameraSelector.DEFAULT_BACK_CAMERA
@@ -450,7 +455,7 @@ internal class CameraController(
                     "format" to "bgra8888",
                 )
             }
-            ImageFormat.RGBA_8888 -> {
+            PixelFormat.RGBA_8888 -> {
                 val buffer = image.planes[0].buffer
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)

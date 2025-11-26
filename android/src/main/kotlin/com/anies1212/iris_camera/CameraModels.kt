@@ -83,7 +83,7 @@ internal object LensCategorizer {
     fun categoryFor(characteristics: CameraCharacteristics): Pair<CameraLensCategoryNative, Double?> {
         val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
         val sensorSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
-        if (focalLengths.isNullOrEmpty() || sensorSize == null) {
+        if (focalLengths == null || focalLengths.isEmpty() || sensorSize == null) {
             return CameraLensCategoryNative.UNKNOWN to null
         }
         val focal = focalLengths.minOrNull() ?: return CameraLensCategoryNative.UNKNOWN to null
