@@ -1,3 +1,11 @@
+## 1.0.4
+
+- Implement video recording functions for both Android and iOS
+- Fix example for iOS
+- Update README for clarity
+- Resolve failing tests
+- Address Android compile error and workflow issues
+
 ## 1.0.3
 
 - Fixed workflow trigger  
