@@ -175,6 +175,26 @@ class _MockIrisCameraPlatform
   @override
   Stream<FocusExposureStateEvent> get focusExposureStateStream =>
       const Stream.empty();
+
+  @override
+  Future<Duration> getMaxExposureDuration() async =>
+      const Duration(milliseconds: 500);
+
+  @override
+  Future<List<Uint8List>> captureBurst({
+    int count = 3,
+    PhotoCaptureOptions options = const PhotoCaptureOptions(),
+    String? directory,
+    String? filenamePrefix,
+  }) async {
+    return List.generate(
+      count,
+      (_) => Uint8List.fromList(<int>[1, 2, 3]),
+    );
+  }
+
+  @override
+  Stream<BurstProgressEvent> get burstProgressStream => const Stream.empty();
 }
 
 class _ThrowingSwitchPlatform
@@ -287,4 +307,24 @@ class _ThrowingSwitchPlatform
   @override
   Stream<FocusExposureStateEvent> get focusExposureStateStream =>
       const Stream.empty();
+
+  @override
+  Future<Duration> getMaxExposureDuration() async =>
+      const Duration(milliseconds: 500);
+
+  @override
+  Future<List<Uint8List>> captureBurst({
+    int count = 3,
+    PhotoCaptureOptions options = const PhotoCaptureOptions(),
+    String? directory,
+    String? filenamePrefix,
+  }) async {
+    return List.generate(
+      count,
+      (_) => Uint8List.fromList(<int>[1, 2, 3]),
+    );
+  }
+
+  @override
+  Stream<BurstProgressEvent> get burstProgressStream => const Stream.empty();
 }

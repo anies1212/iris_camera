@@ -18,6 +18,7 @@ import 'orientation_event.dart';
 import 'camera_state_event.dart';
 import 'focus_exposure_state_event.dart';
 import 'camera_lens_switcher_exception.dart';
+import 'burst_progress_event.dart';
 
 /// Main entry point for interacting with the native camera implementation.
 class IrisCamera {
@@ -174,6 +175,36 @@ class IrisCamera {
     );
   }
 
+  /// Maximum supported exposure duration for the active device.
+  ///
+  /// Returns a [Duration] in microseconds. Use this to clamp long-exposure
+  /// requests to device limits.
+  Future<Duration> getMaxExposureDuration() {
+    return _wrapPlatformExceptions(
+      () => IrisCameraPlatform.instance.getMaxExposureDuration(),
+    );
+  }
+
+  /// Captures multiple photos in rapid succession.
+  ///
+  /// [count] defaults to 3; the platform may clamp to sensible limits. Returns
+  /// a list of JPEG byte arrays in capture order.
+  Future<List<Uint8List>> captureBurst({
+    int count = 3,
+    PhotoCaptureOptions options = const PhotoCaptureOptions(),
+    String? directory,
+    String? filenamePrefix,
+  }) {
+    return _wrapPlatformExceptions(
+      () => IrisCameraPlatform.instance.captureBurst(
+        count: count,
+        options: options,
+        directory: directory,
+        filenamePrefix: filenamePrefix,
+      ),
+    );
+  }
+
   /// Sets the preferred resolution preset for the capture session.
   ///
   /// Call before switching lenses or capturing to influence the active format
@@ -272,6 +303,10 @@ class IrisCamera {
   /// Stream of AF/AE state updates.
   Stream<FocusExposureStateEvent> get focusExposureStateStream =>
       IrisCameraPlatform.instance.focusExposureStateStream;
+
+  /// Stream of burst capture progress events.
+  Stream<BurstProgressEvent> get burstProgressStream =>
+      IrisCameraPlatform.instance.burstProgressStream;
 
   Future<T> _wrapPlatformExceptions<T>(Future<T> Function() body) async {
     try {

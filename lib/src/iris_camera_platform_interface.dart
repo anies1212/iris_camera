@@ -13,6 +13,7 @@ import 'image_stream_frame.dart';
 import 'orientation_event.dart';
 import 'camera_state_event.dart';
 import 'focus_exposure_state_event.dart';
+import 'burst_progress_event.dart';
 
 abstract class IrisCameraPlatform extends PlatformInterface {
   IrisCameraPlatform() : super(token: _token);
@@ -112,6 +113,22 @@ abstract class IrisCameraPlatform extends PlatformInterface {
         'getExposureOffsetStepSize() has not been implemented.');
   }
 
+  /// Returns the maximum supported exposure duration (microseconds).
+  Future<Duration> getMaxExposureDuration() {
+    throw UnimplementedError(
+        'getMaxExposureDuration() has not been implemented.');
+  }
+
+  /// Captures multiple photos in rapid succession.
+  Future<List<Uint8List>> captureBurst({
+    int count = 3,
+    PhotoCaptureOptions options = const PhotoCaptureOptions(),
+    String? directory,
+    String? filenamePrefix,
+  }) {
+    throw UnimplementedError('captureBurst() has not been implemented.');
+  }
+
   Future<void> setResolutionPreset(ResolutionPreset preset) {
     throw UnimplementedError('setResolutionPreset() has not been implemented.');
   }
@@ -162,6 +179,11 @@ abstract class IrisCameraPlatform extends PlatformInterface {
   /// Stream of live image frames from the active camera (BGRA).
   Stream<IrisImageFrame> get imageStream {
     throw UnimplementedError('imageStream has not been implemented.');
+  }
+
+  /// Stream of burst capture progress events.
+  Stream<BurstProgressEvent> get burstProgressStream {
+    throw UnimplementedError('burstProgressStream has not been implemented.');
   }
 
   /// Starts delivering frames over [imageStream].

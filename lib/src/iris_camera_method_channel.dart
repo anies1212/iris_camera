@@ -14,6 +14,7 @@ import 'method_channel_keys.dart';
 import 'orientation_event.dart';
 import 'camera_state_event.dart';
 import 'focus_exposure_state_event.dart';
+import 'burst_progress_event.dart';
 
 class MethodChannelIrisCamera extends IrisCameraPlatform {
   /// The method channel used to interact with the native platform.
@@ -27,10 +28,13 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
       EventChannel(IrisChannel.state.name);
   static final EventChannel _focusExposureStateChannel =
       EventChannel(IrisChannel.focusExposureState.name);
+  static final EventChannel _burstProgressChannel =
+      EventChannel(IrisChannel.burstProgress.name);
   Stream<IrisImageFrame>? _imageStream;
   Stream<OrientationEvent>? _orientationStream;
   Stream<CameraStateEvent>? _stateStream;
   Stream<FocusExposureStateEvent>? _focusExposureStateStream;
+  Stream<BurstProgressEvent>? _burstProgressStream;
 
   @override
   Future<String?> getPlatformVersion() async {
@@ -253,6 +257,36 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
   }
 
   @override
+  Future<Duration> getMaxExposureDuration() async {
+    _ensureSupported();
+    final value = await methodChannel
+        .invokeMethod<num>(IrisMethod.getMaxExposureDuration.method);
+    return Duration(microseconds: (value ?? 0).toInt());
+  }
+
+  @override
+  Future<List<Uint8List>> captureBurst({
+    int count = 3,
+    PhotoCaptureOptions options = const PhotoCaptureOptions(),
+    String? directory,
+    String? filenamePrefix,
+  }) async {
+    _ensureSupported();
+    final rawList = await methodChannel.invokeListMethod<Uint8List>(
+      IrisMethod.captureBurst.method,
+      <String, dynamic>{
+        IrisArgKey.count.key: count,
+        if (directory != null) IrisArgKey.directory.key: directory,
+        if (filenamePrefix != null)
+          IrisArgKey.filenamePrefix.key: filenamePrefix,
+        ...options.toMap(),
+      },
+    );
+    final result = rawList ?? const <Uint8List>[];
+    return result.toList(growable: false);
+  }
+
+  @override
   Future<void> setResolutionPreset(ResolutionPreset preset) async {
     _ensureSupported();
     await methodChannel.invokeMethod<void>(
@@ -292,6 +326,14 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
         _ensureSupported();
         final map = _coerceMap(event);
         return FocusExposureStateEvent.fromMap(map);
+      });
+
+  @override
+  Stream<BurstProgressEvent> get burstProgressStream => _burstProgressStream ??=
+          _burstProgressChannel.receiveBroadcastStream().map((event) {
+        _ensureSupported();
+        final map = _coerceMap(event);
+        return BurstProgressEvent.fromMap(map);
       });
 
   @override

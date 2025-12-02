@@ -9,5 +9,6 @@ export 'src/focus_mode.dart';
 export 'src/orientation_event.dart';
 export 'src/camera_state_event.dart';
 export 'src/focus_exposure_state_event.dart';
+export 'src/burst_progress_event.dart';
 export 'src/widgets/iris_camera_preview.dart';
 export 'src/widgets/focus_indicator_controller.dart';

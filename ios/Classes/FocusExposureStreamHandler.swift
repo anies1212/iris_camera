@@ -34,3 +34,39 @@ final class FocusExposureStreamHandler: NSObject, FlutterStreamHandler {
     }
   }
 }
+
+/// Emits burst capture progress updates.
+final class BurstProgressStreamHandler: NSObject, FlutterStreamHandler {
+  private var sink: FlutterEventSink?
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    sink = events
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    sink = nil
+    return nil
+  }
+
+  func emit(total: Int, completed: Int, status: BurstProgressStatusNative, error: String?) {
+    guard let sink else { return }
+    var payload: [String: Any] = [
+      "total": total,
+      "completed": completed,
+      "status": status.rawValue,
+    ]
+    if let error {
+      payload["error"] = error
+    }
+    DispatchQueue.main.async {
+      sink(payload)
+    }
+  }
+}
+
+enum BurstProgressStatusNative: String {
+  case inProgress
+  case done
+  case error
+}

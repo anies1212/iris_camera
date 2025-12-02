@@ -33,6 +33,7 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
     private lateinit var orientationChannel: EventChannel
     private lateinit var stateChannel: EventChannel
     private lateinit var focusExposureChannel: EventChannel
+    private lateinit var burstProgressChannel: EventChannel
     private var applicationContext: Context? = null
     private var activity: Activity? = null
     private var activityBinding: ActivityPluginBinding? = null
@@ -42,6 +43,7 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
     private var orientationStreamHandler: OrientationStreamHandler? = null
     private val stateStreamHandler = StateStreamHandler()
     private val focusExposureStreamHandler = FocusExposureStreamHandler()
+    private val burstProgressStreamHandler = BurstProgressStreamHandler()
     private val permissionWaiters = mutableListOf<CompletableDeferred<Boolean>>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val permissionListener =
@@ -74,6 +76,8 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
 
         focusExposureChannel = EventChannel(binding.binaryMessenger, "iris_camera/focusExposureState")
         focusExposureChannel.setStreamHandler(focusExposureStreamHandler)
+        burstProgressChannel = EventChannel(binding.binaryMessenger, "iris_camera/burstProgress")
+        burstProgressChannel.setStreamHandler(burstProgressStreamHandler)
 
         val factory = object : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
             override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
@@ -95,6 +99,7 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
                 imageStreamHandler = imageStreamHandler,
                 stateStreamHandler = stateStreamHandler,
                 focusExposureStreamHandler = focusExposureStreamHandler,
+                burstProgressStreamHandler = burstProgressStreamHandler,
             )
         }
     }
@@ -207,6 +212,30 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
 
             "getExposureOffsetStepSize" -> launchWithPermission(result) {
                 result.success(cameraController?.getExposureOffsetStepSize() ?: 0.1)
+            }
+
+            "getMaxExposureDuration" -> launchWithPermission(result) {
+                val micros = cameraController?.getMaxExposureDurationMicros() ?: 0L
+                result.success(micros)
+            }
+
+            "captureBurst" -> launchWithPermission(result) {
+                val count = (call.argument<Int>("count") ?: 3).coerceAtMost(10).coerceAtLeast(1)
+                val flashMode = call.argument<String>("flashMode")
+                val exposureMicros = call.argument<Number>("exposureDurationMicros")?.toLong()
+                val iso = call.argument<Number>("iso")?.toDouble()
+                val directory = call.argument<String>("directory")
+                val prefix = call.argument<String>("filenamePrefix")
+                val photos = cameraController?.captureBurst(
+                    count,
+                    flashMode,
+                    exposureMicros,
+                    iso,
+                    directory,
+                    prefix,
+                    burstProgressStreamHandler,
+                ) ?: emptyList()
+                result.success(photos)
             }
 
             "setResolutionPreset" -> launchWithPermission(result) {
@@ -334,6 +363,7 @@ class IrisCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activit
         orientationChannel.setStreamHandler(null)
         stateChannel.setStreamHandler(null)
         focusExposureChannel.setStreamHandler(null)
+        burstProgressChannel.setStreamHandler(null)
         scope.launch { cameraController?.disposeSession() }
     }
 

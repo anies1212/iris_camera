@@ -112,3 +112,26 @@ internal class FocusExposureStreamHandler : EventChannel.StreamHandler {
         }
     }
 }
+
+internal class BurstProgressStreamHandler : EventChannel.StreamHandler {
+    private var sink: EventChannel.EventSink? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        sink = events
+    }
+
+    override fun onCancel(arguments: Any?) {
+        sink = null
+    }
+
+    fun emit(total: Int, completed: Int, status: String, error: String? = null) {
+        val payload = mutableMapOf<String, Any?>(
+            "total" to total,
+            "completed" to completed,
+            "status" to status,
+        )
+        if (error != null) payload["error"] = error
+        mainHandler.post { sink?.success(payload) }
+    }
+}

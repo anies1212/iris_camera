@@ -45,6 +45,8 @@ import kotlin.coroutines.resumeWithException
 import kotlin.math.roundToInt
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal class CameraController(
     private val context: Context,
@@ -52,6 +54,7 @@ internal class CameraController(
     private val imageStreamHandler: ImageStreamHandler,
     private val stateStreamHandler: StateStreamHandler,
     private val focusExposureStreamHandler: FocusExposureStreamHandler,
+    private val burstProgressStreamHandler: BurstProgressStreamHandler,
 ) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var cameraProvider: ProcessCameraProvider? = null
@@ -201,6 +204,40 @@ internal class CameraController(
             camera2?.setCaptureRequestOptions(options.build())
         }
         return suspendCancellableTakePicture(capture)
+    }
+
+    suspend fun captureBurst(
+        count: Int,
+        flashMode: String?,
+        exposureDurationMicros: Long?,
+        iso: Double?,
+        directory: String?,
+        filenamePrefix: String?,
+        progressHandler: BurstProgressStreamHandler,
+    ): List<ByteArray> {
+        val captures = mutableListOf<ByteArray>()
+        val saveDir = directory?.let { File(it) }
+        if (saveDir != null && !saveDir.exists()) {
+            saveDir.mkdirs()
+        }
+        val limit = 10
+        if (count > limit) {
+            throw IllegalArgumentException("Burst count exceeds limit $limit")
+        }
+        repeat(count) { index ->
+            val jpeg = capturePhoto(flashMode, exposureDurationMicros, iso)
+            captures.add(jpeg)
+            if (saveDir != null) {
+                val name = "${filenamePrefix ?: "burst"}_${System.currentTimeMillis()}_$index.jpg"
+                val outFile = File(saveDir, name)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    outFile.writeBytes(jpeg)
+                }
+            }
+            progressHandler.emit(count, captures.size, "inProgress", null)
+        }
+        progressHandler.emit(count, captures.size, "done", null)
+        return captures
     }
 
     suspend fun startVideoRecording(filePath: String?, enableAudio: Boolean): String {
@@ -378,6 +415,16 @@ internal class CameraController(
     fun getExposureOffsetStepSize(): Double {
         val exposureState = camera?.cameraInfo?.exposureState ?: return 0.1
         return exposureState.exposureCompensationStep.toDouble()
+    }
+
+    suspend fun getMaxExposureDurationMicros(): Long {
+        ensureInitialized()
+        val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val lensId = selectedLensId ?: listAvailableLenses(includeFront = true).firstOrNull()?.id
+        val characteristics = lensId?.let { manager.getCameraCharacteristics(it) } ?: return 0L
+        val range = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+        val maxNs = range?.upper ?: return 0L
+        return maxNs / 1000L
     }
 
     suspend fun startImageStream() {

@@ -13,7 +13,10 @@ enum IrisChannel {
   state('iris_camera/state'),
 
   /// Event channel that reports focus/exposure state changes.
-  focusExposureState('iris_camera/focusExposureState');
+  focusExposureState('iris_camera/focusExposureState'),
+
+  /// Event channel that reports burst capture progress.
+  burstProgress('iris_camera/burstProgress');
 
   const IrisChannel(this.name);
   final String name;
@@ -103,7 +106,13 @@ enum IrisMethod {
   resumeSession('resumeSession'),
 
   /// Disposes the session and releases resources.
-  disposeSession('disposeSession');
+  disposeSession('disposeSession'),
+
+  /// Reads the maximum exposure duration supported by the active device (microseconds).
+  getMaxExposureDuration('getMaxExposureDuration'),
+
+  /// Captures multiple photos in rapid succession.
+  captureBurst('captureBurst');
 
   const IrisMethod(this.method);
   final String method;
@@ -196,7 +205,16 @@ enum IrisArgKey {
   errorCode('errorCode'),
 
   /// Error message emitted from platform.
-  errorMessage('errorMessage');
+  errorMessage('errorMessage'),
+
+  /// Number of captures to perform in burst mode.
+  count('count'),
+
+  /// Optional directory path to save burst photos.
+  directory('directory'),
+
+  /// Optional filename prefix for saved burst photos.
+  filenamePrefix('filenamePrefix');
 
   const IrisArgKey(this.key);
   final String key;

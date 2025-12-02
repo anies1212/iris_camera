@@ -9,7 +9,8 @@
 ## Highlights
 - 🔍 Lens discovery & switching – list every lens (front included by default; exclude with `includeFrontCameras: false`) and reconfigure with `switchLens`.
 - 🖼️ Native preview widget – `IrisCameraPreview` wraps `AVCaptureVideoPreviewLayer` with tap-to-focus + overlay hooks.
-- 📸 Still capture – `capturePhoto` with flash/ISO/exposure overrides.
+- 📸 Still capture – `capturePhoto` with flash/ISO/exposure overrides. Long exposure is supported; query the device max via `getMaxExposureDuration`.
+- 📸 Burst – `captureBurst(count, options)` supports long exposure/ISO overrides, optional file saving (`directory`, `filenamePrefix`), and progress events via `burstProgressStream`.
 - 🎛️ Pro controls – focus mode/point, exposure mode/point/EV, white balance, frame rate range, torch, zoom, resolution presets.
 - 📡 Streams – live BGRA image stream, orientation stream, lifecycle state stream, AF/AE state stream.
 - 🔧 Lifecycle – explicit `initialize/pause/resume/dispose` and structured errors via `IrisCameraException`.
@@ -18,6 +19,10 @@
 ---
 
 ## Install
+
+### Supported platforms
+- Android: minSdk **26**+, targetSdk 34 (CameraX 1.3.x)
+- iOS: iOS **15.0**+
 ```bash
 flutter pub add iris_camera
 ```
@@ -77,6 +82,9 @@ Key methods:
 - `listAvailableLenses({includeFrontCameras})` → `List<CameraLensDescriptor>`
 - `switchLens(CameraLensCategory category)` → `CameraLensDescriptor`
 - `capturePhoto({PhotoCaptureOptions options})` → `Uint8List`
+- `captureBurst({count, PhotoCaptureOptions options, directory, filenamePrefix})` → `List<Uint8List>` or saved file paths when `directory` is set
+- `burstProgressStream` → `BurstProgressEvent(total, completed, status, error?)`
+- `getMaxExposureDuration()` → `Duration` (use to clamp long exposures)
 - `startVideoRecording({filePath, enableAudio})` → `String path`
 - `stopVideoRecording()` → `String path`
 - Focus: `setFocus(point/lensPosition)`, `setFocusMode`, `focusExposureStateStream`

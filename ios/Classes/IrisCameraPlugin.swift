@@ -9,6 +9,7 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
   private static let orientationChannelName = "iris_camera/orientation"
   private static let stateChannelName = "iris_camera/state"
   private static let focusExposureChannelName = "iris_camera/focusExposureState"
+  private static let burstProgressChannelName = "iris_camera/burstProgress"
 
   private let sessionQueue = DispatchQueue(label: "iris_camera.session")
   private let captureSession = AVCaptureSession()
@@ -19,7 +20,7 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
   private var currentInput: AVCaptureDeviceInput?
   private var audioInput: AVCaptureDeviceInput?
   private var selectedLensID: String?
-  private var pendingPhotoCapture: PhotoCaptureDelegate?
+  private var pendingPhotoCapture: AVCapturePhotoCaptureDelegate?
   private var pendingVideoResult: FlutterResult?
   private var currentSessionPreset: AVCaptureSession.Preset = .high
   private var imageStreamSink: FlutterEventSink?
@@ -27,6 +28,7 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
   private let orientationStreamHandler = OrientationStreamHandler()
   private let stateStreamHandler = StateStreamHandler()
   private let focusExposureStreamHandler = FocusExposureStreamHandler()
+  private let burstProgressStreamHandler = BurstProgressStreamHandler()
   private var isInitialized = false
   private var isPaused = false
   private var isRecordingVideo = false
@@ -62,6 +64,12 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       binaryMessenger: registrar.messenger()
     )
     focusExposureChannel.setStreamHandler(instance.focusExposureStreamHandler)
+
+    let burstProgressChannel = FlutterEventChannel(
+      name: burstProgressChannelName,
+      binaryMessenger: registrar.messenger()
+    )
+    burstProgressChannel.setStreamHandler(instance.burstProgressStreamHandler)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -74,6 +82,8 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       switchLens(arguments: call.arguments, result: result)
     case "takePhoto":
       takePhoto(arguments: call.arguments, result: result)
+    case "captureBurst":
+      captureBurst(arguments: call.arguments, result: result)
     case "startVideoRecording":
       startVideoRecording(arguments: call.arguments, result: result)
     case "stopVideoRecording":
@@ -100,6 +110,8 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       getCurrentExposureOffset(result: result)
     case "getExposureOffsetStepSize":
       getExposureOffsetStepSize(result: result)
+    case "getMaxExposureDuration":
+      getMaxExposureDuration(result: result)
     case "startImageStream":
       startImageStream(result: result)
     case "stopImageStream":
@@ -441,6 +453,120 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         }
       }
     }
+  }
+
+  private func captureBurst(arguments: Any?, result: @escaping FlutterResult) {
+    ensureAuthorization { [weak self] authResult in
+      guard let self else { return }
+      switch authResult {
+      case .failure(let error):
+        DispatchQueue.main.async { result(error.flutterError) }
+      case .success:
+        self.sessionQueue.async {
+          self.startSessionIfNeeded()
+          self.performBurstCapture(arguments: arguments, result: result)
+        }
+      }
+    }
+  }
+
+  private func performBurstCapture(arguments: Any?, result: @escaping FlutterResult) {
+    guard currentInput != nil else {
+      DispatchQueue.main.async {
+        result(FlutterError(
+          code: "session_not_configured",
+          message: "No active camera session is available for capture.",
+          details: nil
+        ))
+      }
+      return
+    }
+
+    let payload = arguments as? [String: Any]
+    let flashMode = flashMode(from: payload?["flashMode"] as? String)
+    let settings = AVCapturePhotoSettings()
+    let supportedFlashModes: [AVCaptureDevice.FlashMode] =
+      (photoOutput.supportedFlashModes as [Any]).compactMap { value in
+        if let mode = value as? AVCaptureDevice.FlashMode {
+          return mode
+        }
+        if let number = value as? NSNumber {
+          return AVCaptureDevice.FlashMode(rawValue: number.intValue)
+        }
+        return nil
+      }
+    if supportedFlashModes.contains(flashMode) {
+      settings.flashMode = flashMode
+    }
+    let count = max(1, min((payload?["count"] as? Int) ?? 3, 10))
+    let directoryPath = payload?["directory"] as? String
+    let filenamePrefix = payload?["filenamePrefix"] as? String ?? "burst"
+
+    let exposureMicros = payload?["exposureDurationMicros"] as? Double ??
+    (payload?["exposureDurationMicros"] as? NSNumber)?.doubleValue
+    let isoOverride = payload?["iso"] as? Double ??
+    (payload?["iso"] as? NSNumber)?.doubleValue
+    let appliedManualExposure = applyManualExposure(
+      exposureMicros: exposureMicros,
+      iso: isoOverride
+    )
+
+    let cleanup: (() -> Void)? = appliedManualExposure ? { [weak self] in
+      guard let self else { return }
+      self.sessionQueue.async {
+        self.restoreAutomaticExposure()
+      }
+    } : nil
+
+    let delegate = BurstCaptureDelegate(
+      expectedCount: count,
+      cleanup: cleanup,
+      progressHandler: burstProgressStreamHandler
+    ) { [weak self] captureResult in
+      guard let self else { return }
+      self.pendingPhotoCapture = nil
+      DispatchQueue.main.async {
+        switch captureResult {
+        case .success(let images):
+          self.burstProgressStreamHandler.emit(total: count, completed: images.count, status: .done, error: nil)
+          if let directoryPath,
+             let urls = self.saveBurstImages(images, directoryPath: directoryPath, prefix: filenamePrefix) {
+            result(urls)
+            return
+          }
+          result(images.map { FlutterStandardTypedData(bytes: $0) })
+        case .failure(let error):
+          self.burstProgressStreamHandler.emit(total: count, completed: 0, status: .error, error: error.flutterError.message)
+          result(error.flutterError)
+        }
+      }
+    }
+
+    pendingPhotoCapture = delegate
+    for _ in 0..<count {
+      photoOutput.capturePhoto(with: settings, delegate: delegate)
+    }
+  }
+
+private func saveBurstImages(_ images: [Data], directoryPath: String, prefix: String) -> [String]? {
+    let directoryUrl = URL(fileURLWithPath: directoryPath, isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(at: directoryUrl, withIntermediateDirectories: true)
+    } catch {
+      return nil
+    }
+    var urls: [String] = []
+    for (index, data) in images.enumerated() {
+      let filename = "\(prefix)_\(Int(Date().timeIntervalSince1970 * 1000))_\(index).jpg"
+      let url = directoryUrl.appendingPathComponent(filename)
+      do {
+        try data.write(to: url)
+        urls.append(url.path)
+      } catch {
+        return nil
+      }
+    }
+    return urls
   }
 
   private func startVideoRecording(arguments: Any?, result: @escaping FlutterResult) {
@@ -957,6 +1083,17 @@ public class SwiftIrisCameraPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
     result(min(step, max(0.01, range)))
   }
 
+  private func getMaxExposureDuration(result: @escaping FlutterResult) {
+    guard let device = currentInput?.device else {
+      result(0.0)
+      return
+    }
+    let duration = device.activeFormat.maxExposureDuration
+    let seconds = CMTimeGetSeconds(duration)
+    let micros = max(0.0, seconds * 1_000_000.0)
+    result(micros)
+  }
+
   private func setFocusMode(arguments: Any?, result: @escaping FlutterResult) {
     guard let device = currentInput?.device else {
       result(FlutterError(
@@ -1405,6 +1542,45 @@ private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegat
     }
     completion(.success(data))
     cleanup?()
+  }
+}
+
+private final class BurstCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+  private let expectedCount: Int
+  private var received = 0
+  private var images: [Data] = []
+  private let completion: (Result<[Data], PhotoCaptureError>) -> Void
+  private let cleanup: (() -> Void)?
+  private weak var progressHandler: BurstProgressStreamHandler?
+
+  init(
+    expectedCount: Int,
+    cleanup: (() -> Void)?,
+    progressHandler: BurstProgressStreamHandler,
+    completion: @escaping (Result<[Data], PhotoCaptureError>) -> Void
+  ) {
+    self.expectedCount = expectedCount
+    self.completion = completion
+    self.cleanup = cleanup
+    self.progressHandler = progressHandler
+    super.init()
+  }
+
+  func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+    received += 1
+    if let error {
+      completion(.failure(.captureFailed(message: error.localizedDescription)))
+      cleanup?()
+      return
+    }
+    if let data = photo.fileDataRepresentation() {
+      images.append(data)
+    }
+    progressHandler?.emit(total: expectedCount, completed: received, status: .inProgress, error: nil)
+    if received >= expectedCount {
+      completion(.success(images))
+      cleanup?()
+    }
   }
 }
 
