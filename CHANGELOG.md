@@ -1,3 +1,9 @@
+## 1.0.5
+
+- Updated example Android minSdk to 26  
+- Introduced burst progress events  
+- Increased platform minimums  
+
 ## 1.0.4
 
 - Implement video recording functions for both Android and iOS
