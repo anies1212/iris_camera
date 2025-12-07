@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
 import 'package:flutter/services.dart' show PlatformViewCreatedCallback;
 
+import '../iris_platform.dart';
 import 'focus_indicator_controller.dart';
 import 'iris_camera_preview_stub.dart'
     if (dart.library.js_interop) 'iris_camera_preview_web.dart' as web_preview;
@@ -124,33 +124,33 @@ class _IrisCameraPreviewState extends State<IrisCameraPreview> {
   Widget build(BuildContext context) {
     Widget preview;
 
-    if (kIsWeb) {
-      // Web platform uses HtmlElementView
-      preview = web_preview.buildWebPreview(
-        onViewCreated: widget.onViewCreated,
-      );
+    final platform = currentPlatformOrNull;
+    if (platform == null) {
+      preview = widget.placeholder ??
+          const Center(
+            child: Text(
+              'Camera preview is only available on iOS/Android/Web.',
+              textAlign: TextAlign.center,
+            ),
+          );
     } else {
-      switch (defaultTargetPlatform) {
-        case TargetPlatform.iOS:
+      switch (platform) {
+        case IrisPlatform.iOS:
           preview = UiKitView(
             viewType: _kPreviewViewType,
             hitTestBehavior: widget.hitTestBehavior,
             onPlatformViewCreated: widget.onViewCreated,
           );
-        case TargetPlatform.android:
+        case IrisPlatform.android:
           preview = AndroidView(
             viewType: _kPreviewViewType,
             hitTestBehavior: widget.hitTestBehavior,
             onPlatformViewCreated: widget.onViewCreated,
           );
-        default:
-          preview = widget.placeholder ??
-              const Center(
-                child: Text(
-                  'Camera preview is only available on iOS/Android/Web.',
-                  textAlign: TextAlign.center,
-                ),
-              );
+        case IrisPlatform.web:
+          preview = web_preview.buildWebPreview(
+            onViewCreated: widget.onViewCreated,
+          );
       }
     }
 

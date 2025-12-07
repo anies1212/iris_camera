@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'iris_camera_platform_interface.dart';
+import 'iris_platform.dart';
 import 'camera_lens_descriptor.dart';
 import 'exposure_mode.dart';
 import 'focus_mode.dart';
@@ -127,17 +128,18 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     Offset? point,
     double? lensPosition,
   }) async {
-    _ensureSupported();
+    final platform = _ensureSupported();
     if (lensPosition != null) {
-      switch (defaultTargetPlatform) {
-        case TargetPlatform.android:
+      switch (platform) {
+        case IrisPlatform.android:
           throw PlatformException(
             code: 'unsupported_feature',
             message: 'lensPosition focus is not supported on Android.',
           );
-        case TargetPlatform.iOS:
+        case IrisPlatform.iOS:
           break;
-        default:
+        case IrisPlatform.web:
+          // Not reachable in MethodChannel implementation
           break;
       }
     }
@@ -166,18 +168,19 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     double? temperature,
     double? tint,
   }) async {
-    _ensureSupported();
+    final platform = _ensureSupported();
     if (temperature != null || tint != null) {
-      switch (defaultTargetPlatform) {
-        case TargetPlatform.android:
+      switch (platform) {
+        case IrisPlatform.android:
           throw PlatformException(
             code: 'unsupported_feature',
             message:
                 'Explicit white balance temperature/tint is not supported on Android.',
           );
-        case TargetPlatform.iOS:
+        case IrisPlatform.iOS:
           break;
-        default:
+        case IrisPlatform.web:
+          // Not reachable in MethodChannel implementation
           break;
       }
     }
@@ -446,18 +449,22 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     throw FormatException('Expected a map payload but received $payload');
   }
 
-  void _ensureSupported() {
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.iOS:
-      case TargetPlatform.android:
-        return;
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
+  IrisPlatform _ensureSupported() {
+    final platform = currentPlatformOrNull;
+    if (platform == null) {
+      throw PlatformException(
+        code: 'unsupported_platform',
+        message: 'MethodChannelIrisCamera is only supported on iOS and Android.',
+      );
+    }
+    switch (platform) {
+      case IrisPlatform.iOS:
+      case IrisPlatform.android:
+        return platform;
+      case IrisPlatform.web:
         throw PlatformException(
           code: 'unsupported_platform',
-          message: 'MethodChannelIrisCamera is only supported on iOS and Android.',
+          message: 'MethodChannelIrisCamera is not available on Web. Use IrisCameraWeb instead.',
         );
     }
   }

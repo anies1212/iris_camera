@@ -1,4 +1,5 @@
 export 'src/iris_camera_impl.dart' show IrisCamera;
+export 'src/iris_platform.dart';
 export 'src/camera_lens_descriptor.dart';
 export 'src/camera_lens_switcher_exception.dart';
 export 'src/photo_capture_options.dart';
