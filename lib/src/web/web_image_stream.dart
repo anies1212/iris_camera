@@ -60,11 +60,7 @@ class WebImageStream {
         _offscreenCanvas!.height,
       );
 
-      final data = imageData.data.toDart;
-      final bytes = Uint8List(data.length);
-      for (var i = 0; i < data.length; i++) {
-        bytes[i] = data[i].toInt();
-      }
+      final bytes = Uint8List.fromList(imageData.data.toDart);
 
       _controller.add(IrisImageFrame(
         bytes: bytes,

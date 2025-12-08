@@ -1,6 +1,6 @@
-import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
 
+import 'package:flutter/services.dart' show PlatformViewCreatedCallback;
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
