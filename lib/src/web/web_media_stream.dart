@@ -7,21 +7,15 @@ import '../resolution_preset.dart';
 
 /// Manages MediaStream acquisition and camera device handling.
 class WebMediaStream {
-  web.MediaStream? _mediaStream;
-  web.HTMLVideoElement? _videoElement;
-  String? _currentDeviceId;
+  web.MediaStream? mediaStream;
+  web.HTMLVideoElement? videoElement;
+  String? currentDeviceId;
   List<web.MediaDeviceInfo>? _availableDevices;
-  ResolutionPreset _resolutionPreset = ResolutionPreset.high;
+  ResolutionPreset resolutionPreset = ResolutionPreset.high;
   double _currentZoom = 1.0;
   bool _torchEnabled = false;
 
-  web.MediaStream? get mediaStream => _mediaStream;
-  web.HTMLVideoElement? get videoElement => _videoElement;
-  String? get currentDeviceId => _currentDeviceId;
-  bool get hasActiveStream => _mediaStream != null;
-
-  set currentDeviceId(String? value) => _currentDeviceId = value;
-  set resolutionPreset(ResolutionPreset value) => _resolutionPreset = value;
+  bool get hasActiveStream => mediaStream != null;
 
   /// Requests camera permission by temporarily acquiring a stream.
   Future<void> requestCameraPermission() async {
@@ -95,16 +89,16 @@ class WebMediaStream {
   /// Starts the media stream with current settings.
   Future<void> startStream() async {
     final constraints = _buildConstraints();
-    _mediaStream = await web.window.navigator.mediaDevices
+    mediaStream = await web.window.navigator.mediaDevices
         .getUserMedia(constraints)
         .toDart;
 
-    _videoElement = web.HTMLVideoElement()
+    videoElement = web.HTMLVideoElement()
       ..autoplay = true
       ..muted = true
       ..setAttribute('playsinline', 'true');
-    _videoElement!.srcObject = _mediaStream;
-    await _videoElement!.play().toDart;
+    videoElement!.srcObject = mediaStream;
+    await videoElement!.play().toDart;
 
     _applyTrackConstraints();
   }
@@ -112,20 +106,20 @@ class WebMediaStream {
   web.MediaStreamConstraints _buildConstraints() {
     final videoConstraints = <String, Object>{};
 
-    if (_currentDeviceId != null) {
-      videoConstraints['deviceId'] = {'exact': _currentDeviceId!};
+    if (currentDeviceId != null) {
+      videoConstraints['deviceId'] = {'exact': currentDeviceId!};
     }
 
     final resolution = _getResolution();
     videoConstraints['width'] = {'ideal': resolution.$1};
     videoConstraints['height'] = {'ideal': resolution.$2};
 
-    final jsVideo = videoConstraints.jsify();
+    final jsVideo = (videoConstraints.jsify() ?? <String, Object>{}.jsify())!;
     return web.MediaStreamConstraints(video: jsVideo, audio: false.toJS);
   }
 
   (int, int) _getResolution() {
-    return switch (_resolutionPreset) {
+    return switch (resolutionPreset) {
       ResolutionPreset.low => (320, 240),
       ResolutionPreset.medium => (720, 480),
       ResolutionPreset.high => (1280, 720),
@@ -137,13 +131,13 @@ class WebMediaStream {
 
   /// Stops the current media stream.
   Future<void> stopStream() async {
-    if (_mediaStream != null) {
-      for (final track in _mediaStream!.getTracks().toDart) {
+    if (mediaStream != null) {
+      for (final track in mediaStream!.getTracks().toDart) {
         track.stop();
       }
-      _mediaStream = null;
+      mediaStream = null;
     }
-    _videoElement = null;
+    videoElement = null;
   }
 
   /// Sets the zoom level.
@@ -160,9 +154,9 @@ class WebMediaStream {
 
   /// Applies frame rate constraints.
   Future<void> setFrameRateRange({double? minFps, double? maxFps}) async {
-    if (_mediaStream == null) return;
+    if (mediaStream == null) return;
 
-    final videoTracks = _mediaStream!.getVideoTracks().toDart;
+    final videoTracks = mediaStream!.getVideoTracks().toDart;
     if (videoTracks.isEmpty) return;
 
     final track = videoTracks.first;
@@ -181,17 +175,17 @@ class WebMediaStream {
 
   /// Enables/disables video tracks.
   void setTracksEnabled(bool enabled) {
-    if (_mediaStream != null) {
-      for (final track in _mediaStream!.getVideoTracks().toDart) {
+    if (mediaStream != null) {
+      for (final track in mediaStream!.getVideoTracks().toDart) {
         track.enabled = enabled;
       }
     }
   }
 
   void _applyTrackConstraints() {
-    if (_mediaStream == null) return;
+    if (mediaStream == null) return;
 
-    final videoTracks = _mediaStream!.getVideoTracks().toDart;
+    final videoTracks = mediaStream!.getVideoTracks().toDart;
     if (videoTracks.isEmpty) return;
 
     final track = videoTracks.first;
