@@ -1,11 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
 import 'package:flutter/services.dart' show PlatformViewCreatedCallback;
 
+import '../iris_platform.dart';
 import 'focus_indicator_controller.dart';
+import 'iris_camera_preview_stub.dart'
+    if (dart.library.js_interop) 'iris_camera_preview_web.dart' as web_preview;
 
 const String _kPreviewViewType = 'iris_camera/preview';
 
@@ -121,27 +123,35 @@ class _IrisCameraPreviewState extends State<IrisCameraPreview> {
   @override
   Widget build(BuildContext context) {
     Widget preview;
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.iOS:
-        preview = UiKitView(
-          viewType: _kPreviewViewType,
-          hitTestBehavior: widget.hitTestBehavior,
-          onPlatformViewCreated: widget.onViewCreated,
-        );
-      case TargetPlatform.android:
-        preview = AndroidView(
-          viewType: _kPreviewViewType,
-          hitTestBehavior: widget.hitTestBehavior,
-          onPlatformViewCreated: widget.onViewCreated,
-        );
-      default:
-        preview = widget.placeholder ??
-            const Center(
-              child: Text(
-                'Camera preview is only available on iOS/Android devices.',
-                textAlign: TextAlign.center,
-              ),
-            );
+
+    final platform = currentPlatformOrNull;
+    if (platform == null) {
+      preview = widget.placeholder ??
+          const Center(
+            child: Text(
+              'Camera preview is only available on iOS/Android/Web.',
+              textAlign: TextAlign.center,
+            ),
+          );
+    } else {
+      switch (platform) {
+        case IrisPlatform.iOS:
+          preview = UiKitView(
+            viewType: _kPreviewViewType,
+            hitTestBehavior: widget.hitTestBehavior,
+            onPlatformViewCreated: widget.onViewCreated,
+          );
+        case IrisPlatform.android:
+          preview = AndroidView(
+            viewType: _kPreviewViewType,
+            hitTestBehavior: widget.hitTestBehavior,
+            onPlatformViewCreated: widget.onViewCreated,
+          );
+        case IrisPlatform.web:
+          preview = web_preview.buildWebPreview(
+            onViewCreated: widget.onViewCreated,
+          );
+      }
     }
 
     preview = DecoratedBox(

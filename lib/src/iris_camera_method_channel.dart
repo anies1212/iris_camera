@@ -1,9 +1,8 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'iris_camera_platform_interface.dart';
+import 'iris_platform.dart';
 import 'camera_lens_descriptor.dart';
 import 'exposure_mode.dart';
 import 'focus_mode.dart';
@@ -129,13 +128,21 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     Offset? point,
     double? lensPosition,
   }) async {
-    if (Platform.isAndroid && lensPosition != null) {
-      throw PlatformException(
-        code: 'unsupported_feature',
-        message: 'lensPosition focus is not supported on Android.',
-      );
+    final platform = _ensureSupported();
+    if (lensPosition != null) {
+      switch (platform) {
+        case IrisPlatform.android:
+          throw PlatformException(
+            code: 'unsupported_feature',
+            message: 'lensPosition focus is not supported on Android.',
+          );
+        case IrisPlatform.iOS:
+          break;
+        case IrisPlatform.web:
+          // Not reachable in MethodChannel implementation
+          break;
+      }
     }
-    _ensureSupported();
     final args = <String, dynamic>{};
     if (point != null) {
       args[IrisArgKey.x.key] = point.dx;
@@ -161,14 +168,22 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     double? temperature,
     double? tint,
   }) async {
-    if (Platform.isAndroid && (temperature != null || tint != null)) {
-      throw PlatformException(
-        code: 'unsupported_feature',
-        message:
-            'Explicit white balance temperature/tint is not supported on Android.',
-      );
+    final platform = _ensureSupported();
+    if (temperature != null || tint != null) {
+      switch (platform) {
+        case IrisPlatform.android:
+          throw PlatformException(
+            code: 'unsupported_feature',
+            message:
+                'Explicit white balance temperature/tint is not supported on Android.',
+          );
+        case IrisPlatform.iOS:
+          break;
+        case IrisPlatform.web:
+          // Not reachable in MethodChannel implementation
+          break;
+      }
     }
-    _ensureSupported();
     final args = <String, dynamic>{};
     if (temperature != null) {
       args[IrisArgKey.temperature.key] = temperature;
@@ -434,12 +449,25 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     throw FormatException('Expected a map payload but received $payload');
   }
 
-  void _ensureSupported() {
-    if (!Platform.isIOS && !Platform.isAndroid) {
+  IrisPlatform _ensureSupported() {
+    final platform = currentPlatformOrNull;
+    if (platform == null) {
       throw PlatformException(
         code: 'unsupported_platform',
-        message: 'iris_camera is only supported on iOS and Android.',
+        message:
+            'MethodChannelIrisCamera is only supported on iOS and Android.',
       );
+    }
+    switch (platform) {
+      case IrisPlatform.iOS:
+      case IrisPlatform.android:
+        return platform;
+      case IrisPlatform.web:
+        throw PlatformException(
+          code: 'unsupported_platform',
+          message:
+              'MethodChannelIrisCamera is not available on Web. Use IrisCameraWeb instead.',
+        );
     }
   }
 }
