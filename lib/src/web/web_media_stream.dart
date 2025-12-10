@@ -55,8 +55,7 @@ class WebMediaStream {
     final lenses = <CameraLensDescriptor>[];
     for (var i = 0; i < videoDevices.length; i++) {
       final device = videoDevices[i];
-      final label =
-          device.label.isNotEmpty ? device.label : 'Camera ${i + 1}';
+      final label = device.label.isNotEmpty ? device.label : 'Camera ${i + 1}';
       final isFront = _isFrontCamera(label);
 
       if (!includeFrontCameras && isFront) continue;

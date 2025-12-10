@@ -250,8 +250,7 @@ class IrisCameraWeb extends IrisCameraPlatform {
   Future<double> getExposureOffsetStepSize() async => 0.1;
 
   @override
-  Future<Duration> getMaxExposureDuration() async =>
-      const Duration(seconds: 1);
+  Future<Duration> getMaxExposureDuration() async => const Duration(seconds: 1);
 
   @override
   Future<void> setResolutionPreset(ResolutionPreset preset) async {

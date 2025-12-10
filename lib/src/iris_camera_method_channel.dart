@@ -454,7 +454,8 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
     if (platform == null) {
       throw PlatformException(
         code: 'unsupported_platform',
-        message: 'MethodChannelIrisCamera is only supported on iOS and Android.',
+        message:
+            'MethodChannelIrisCamera is only supported on iOS and Android.',
       );
     }
     switch (platform) {
@@ -464,7 +465,8 @@ class MethodChannelIrisCamera extends IrisCameraPlatform {
       case IrisPlatform.web:
         throw PlatformException(
           code: 'unsupported_platform',
-          message: 'MethodChannelIrisCamera is not available on Web. Use IrisCameraWeb instead.',
+          message:
+              'MethodChannelIrisCamera is not available on Web. Use IrisCameraWeb instead.',
         );
     }
   }
